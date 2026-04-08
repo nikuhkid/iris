@@ -1,0 +1,682 @@
+{
+  "schema_version": "4.0",
+  "system": "Nyx Controlled Runtime",
+  "mode": "hybrid (test with Claude → migrate to local)",
+  "core_principle": "models suggest, system decides, execution is gated",
+
+  "changelog": {
+    "4.0": [
+      "plan_analysis split into plan_analysis_initial and plan_analysis_final as separate named layers — resolves contradiction between layer definition (single-pass) and execution_flow (two-pass)",
+      "implicit_destructive detection formalized as three-step gate: lexical match → scope gate → argument context check",
+      "slot definitions populated with actual model assignments, temperature delta for independence, retry policy",
+      "redundancy input explicitly specified: slot 2 receives original_input, never slot 1 output",
+      "comparator formally placed inside translation_layer with normalization function defined",
+      "critical_fail added as distinct failure class: conflicting slot 1/2 outputs → user escalation, no auto-resolution via slot 3",
+      "model layer split into planning_model and response_model as separate named layers",
+      "prompt layering hierarchy defined in response_model to prevent DPO authority leakage",
+      "DPO scope formally bounded: tone and register only, never structure or execution behavior",
+      "worker_spawning added as capability on planning_model",
+      "response_model epistemic contract added: training data treated as prior not fact, facts sourced from context/tools only"
+    ]
+  },
+
+  "entry_points": {
+    "sources": ["cli", "claude_interface", "discord_transport"],
+    "normalized_output_schema": {
+      "content": "string",
+      "metadata": {
+        "source": "cli|claude_interface|discord",
+        "user_id": "string|null",
+        "channel_id": "string|null",
+        "guild_id": "string|null",
+        "timestamp": "string"
+      }
+    },
+    "note": "all transports must emit this schema — downstream layers are source-agnostic"
+  },
+
+  "boot_sequence": {
+    "steps": [
+      "initialize_components",
+      "observer_health_check",
+      "if observer_unavailable → follow observer_startup_policy",
+      "initialize_transport_layers",
+      "ready_to_accept_input"
+    ],
+    "observer_startup_policy": {
+      "default_mode": "strict",
+      "strict": {
+        "health_check_required": true,
+        "on_fail": "block_system_startup"
+      },
+      "degraded_allowed": {
+        "health_check_required": true,
+        "on_fail": "start_in_degraded_with_explicit_warning",
+        "user_warning": "Observer unavailable — running without full audit guarantees"
+      }
+    }
+  },
+
+  "layers": {
+
+    "discord_transport": {
+      "role": "optional external interface — Discord bot gateway",
+      "source": "Eliza connector pattern",
+      "status": "not_implemented",
+      "type": "transport_adapter",
+      "placement": "before entry_point normalization",
+      "implementation": "discord.py on Parrot",
+      "behavior": {
+        "triggers": ["DM", "mention", "slash_command"],
+        "input_normalization": [
+          "strip Discord markdown formatting",
+          "extract plain text content",
+          "attach source metadata (user_id, channel_id, guild_id)"
+        ],
+        "output": "post response back to originating channel or DM",
+        "rate_limiting": {
+          "enabled": true,
+          "max_requests_per_minute": 10,
+          "on_exceeded": "reject_with_feedback_and_log"
+        },
+        "chunking": {
+          "enabled": true,
+          "max_message_length": 2000,
+          "strategy": "split_on_newline"
+        },
+        "scope": {
+          "allowed_guilds": "whitelist",
+          "allowed_channels": "whitelist",
+          "allow_dms": true
+        }
+      },
+      "source_policy": {
+        "discord": {
+          "default_capabilities": ["read_only"],
+          "trusted_users": {
+            "<owner_user_id>": ["read_file", "write_file", "execute_plan"]
+          },
+          "note": "replace <owner_user_id> with actual Discord user ID at deploy time"
+        }
+      },
+      "security": {
+        "input_passes_through": "input_guard",
+        "no_direct_execution": true,
+        "source_tagging": "all inputs tagged with source=discord in metadata"
+      }
+    },
+
+    "planning_model": {
+      "role": "convert user intent into structured plan — no personality, no interpretation beyond direct mapping",
+      "current": "Claude (Slot 3 fallback)",
+      "target": "Qwen2.5 14B local via Ollama",
+      "constraints": [
+        "output is strict JSON only — no natural language",
+        "no persona, no tone, no flair",
+        "no authority over execution — suggests only",
+        "model_cannot_request_elevation",
+        "no direct tool execution",
+        "no shell access"
+      ],
+      "prompt_structure": {
+        "order": [
+          "hard_system_constraints",
+          "schema_definition",
+          "task_input"
+        ],
+        "hard_system_constraints": "You are a plan generation component. Output ONLY valid JSON matching the provided schema. No explanations, no commentary, no natural language outside the schema.",
+        "note": "personality is never injected into planning_model prompts — clean separation is mandatory"
+      },
+      "worker_spawning": {
+        "enabled": true,
+        "pattern": "coordinator spawns scoped workers with subset of context",
+        "worker_contract": {
+          "receives": "scoped task + relevant context slice",
+          "returns": "structured result",
+          "lifecycle": "throwaway — context discarded after result returned"
+        },
+        "coordinator_responsibilities": [
+          "decompose task into scoped units",
+          "assign workers",
+          "synthesize worker results",
+          "escalate to Slot 3 when workers return insufficient quality"
+        ],
+        "note": "responsiveness is achieved by keeping coordinator lean and offloading depth to workers, not by making the base model larger"
+      }
+    },
+
+    "response_model": {
+      "role": "generate user-facing natural language response — personality layer only",
+      "current": "Claude (Slot 3 fallback)",
+      "target": "Qwen2.5 14B local via Ollama, DPO fine-tuned",
+      "constraints": [
+        "cannot execute actions",
+        "cannot claim to have executed actions",
+        "cannot claim to have enforced rules",
+        "cannot bypass decision_engine",
+        "cannot claim authority over system decisions",
+        "proposes and expresses — does not decide"
+      ],
+      "prompt_structure": {
+        "order": [
+          "hard_system_constraints",
+          "persona",
+          "task_context",
+          "user_input"
+        ],
+        "hard_system_constraints": "You propose actions and reasoning. You do not execute or enforce. The system validates all actions. You have no authority over execution.",
+        "persona": "injected at runtime — not baked into weights",
+        "task_context": {
+          "fields": [
+            "plan_summary",
+            "decision_outcome",
+            "relevant_state"
+          ]
+        },
+        "note": "constraints are guaranteed by prompt layer — tone is shaped by DPO. constraints never delegated to DPO."
+      },
+      "dpo_scope": {
+        "trains_for": [
+          "conversational register — direct, no hedging, no filler",
+          "epistemic honesty — 'I don't know' not 'as an AI I cannot'",
+          "tone under pressure — confident without claiming authority",
+          "brevity — says the thing, stops"
+        ],
+        "never_trains_for": [
+          "JSON output or structured plans",
+          "tool calls or execution behavior",
+          "rule enforcement or safety decisions",
+          "system authority or decision-making"
+        ],
+        "dataset_contract": {
+          "chosen": "correct system behavior expressed in target register",
+          "rejected": "incorrect or unsafe behavior OR correct behavior expressed as self-narrating AI",
+          "note": "rejected pattern includes 'as a language model I...' collapses — these are the primary target"
+        }
+      },
+      "epistemic_contract": {
+        "training_data": "treated as prior, not fact",
+        "facts": "sourced from context, tools, or verified sources only",
+        "uncertainty": "stated plainly — 'I don't know' or 'I can't verify that' — never deflected via self-narration",
+        "note": "model that confabulates confidently is worse than one that refuses — uncensored base models removed from consideration for this reason"
+      }
+    },
+
+    "observer": {
+      "role": "logging and audit — permanent forensic record",
+      "type": "external_service",
+      "isolation": "separate_process",
+      "communication": "write_only_channel",
+      "observer_runtime_status": {
+        "on_degraded": {
+          "notify_user_once": true,
+          "payload": {
+            "event": "observer_down",
+            "timestamp": "t_down"
+          }
+        },
+        "on_recovery": {
+          "notify_user_once": true,
+          "payload": {
+            "event": "observer_recovered",
+            "timestamp": "t_up",
+            "downtime_duration": "t_up - t_down",
+            "buffer_window": {
+              "start": "t_down",
+              "end": "t_up"
+            },
+            "buffered_entries_count": "int",
+            "reconciliation_pending": true
+          }
+        }
+      },
+      "on_observer_unavailable": {
+        "mode": "degraded",
+        "behavior": [
+          "buffer_locally",
+          "retry_async",
+          "warn_user_if_buffer_exceeds_threshold"
+        ],
+        "local_chain": {
+          "enabled": true,
+          "start_reference": "last_known_valid_hash",
+          "entry_format": {
+            "timestamp": "string",
+            "type": "delayed",
+            "original_sequence_gap": true,
+            "previous_hash": "string",
+            "data": "object"
+          }
+        },
+        "on_recovery": {
+          "strategy": "append_as_linked_segment",
+          "reconciliation_event": {
+            "type": "observer_recovery",
+            "fields": [
+              "missed_window",
+              "local_chain_hash",
+              "entries_count"
+            ]
+          }
+        }
+      },
+      "raw_input_log": true,
+      "pre_execution_log": {
+        "enabled": true,
+        "timing": "before_decision_engine",
+        "write_mode": "append_only",
+        "fields": [
+          "timestamp",
+          "input_hash",
+          "original_plan",
+          "final_plan",
+          "intent",
+          "proposed_actions",
+          "plan_analysis_output",
+          "validation_notes"
+        ],
+        "integrity": {
+          "hash_chain": true,
+          "tamper_detection": true,
+          "algorithm": "SHA-256"
+        }
+      },
+      "stores": [
+        "plans",
+        "decisions",
+        "executed_commands",
+        "failures",
+        "malformed_inputs"
+      ]
+    },
+
+    "input_guard": {
+      "role": "sanitize and validate raw user input",
+      "placement": "before translation_layer",
+      "mode": "strict_with_rich_logging",
+      "checks": [
+        "max_length",
+        "encoding_valid",
+        "prompt_injection_patterns",
+        "command_injection_patterns"
+      ],
+      "injection_pattern_catalogue": {
+        "source": "AgentShield/MiniClaw",
+        "categories": {
+          "high_confidence": [
+            "system_prompt_override",
+            "identity_reassignment",
+            "jailbreak_attempt",
+            "role_escalation_request",
+            "zero_width_unicode",
+            "encoding_obfuscation"
+          ],
+          "medium_confidence": [
+            "tool_invocation_syntax",
+            "instruction_injection_via_content",
+            "recursive_prompt_reference",
+            "context_window_flooding"
+          ],
+          "low_confidence": [
+            "data_exfiltration_url",
+            "base64_encoded_payload"
+          ]
+        },
+        "on_match": {
+          "high_confidence": "reject",
+          "medium_confidence": "flag_and_continue",
+          "low_confidence": "log_only"
+        },
+        "pattern_source": "regex_catalogue — implement per category at build time"
+      },
+      "on_fail": {
+        "action": "reject",
+        "log": {
+          "reason_code": "required",
+          "codes": [
+            "encoding_invalid",
+            "max_length_exceeded",
+            "injection_pattern_detected",
+            "command_injection_detected",
+            "unclassified_rejection"
+          ]
+        }
+      },
+      "sanitize": {
+        "enabled": true,
+        "rules": {
+          "file_path": "normalize_path_only",
+          "search_query": "strip_control_chars",
+          "none": "reject"
+        }
+      },
+      "buffer": {
+        "type": "rolling_ring_buffer",
+        "capacity": 20,
+        "ephemeral": true,
+        "contents_per_entry": [
+          "timestamp",
+          "raw_input",
+          "sanitized_output",
+          "guard_decision",
+          "rejection_reason_code",
+          "downstream_interpretation"
+        ]
+      }
+    },
+
+    "translation_layer": {
+      "role": "convert user input to structured plan via planning_model — owns slot chain, comparator, and failure semantics",
+      "input": "sanitized user input (free text or json)",
+      "slot_chain": {
+        "ordered": true,
+        "retry_policy": {
+          "max_attempts_per_slot": 1,
+          "max_total_attempts": 3,
+          "on_exhaustion": "escalate_to_user"
+        },
+        "slots": {
+          "slot_1": {
+            "model": "Qwen2.5 14B local via Ollama",
+            "role": "primary — default execution path",
+            "temperature": 0.2,
+            "note": "fast, cheap, local"
+          },
+          "slot_2": {
+            "model": "Qwen2.5 14B local via Ollama",
+            "role": "independent validator — used for high-risk ops and redundancy check",
+            "temperature": 0.3,
+            "independence": {
+              "input": "original_input — never slot_1 output",
+              "prompt_variant": "Option A (temperature delta) by default — Option B (prompt rephrasing) as stronger alternative",
+              "note": "slot_2 must produce an independent interpretation — consuming slot_1 output defeats the purpose"
+            }
+          },
+          "slot_3": {
+            "model": "Claude via external API",
+            "role": "last resort — repeated schema failure only",
+            "note": "slot_3 never touches slot_1 vs slot_2 conflicts — conflicts are a user problem, not a smarter-model problem"
+          }
+        },
+        "failure_classification": {
+          "hard_fail": {
+            "triggers": ["malformed_output", "timeout", "api_error"],
+            "action": "next_slot_in_chain"
+          },
+          "soft_fail": {
+            "triggers": ["schema_violation", "missing_fields"],
+            "action": "next_slot_in_chain"
+          },
+          "critical_fail": {
+            "triggers": ["slot_1_vs_slot_2_output_conflict"],
+            "action": "escalate_to_user",
+            "note": "no auto-resolution — conflicting interpretations mean the system does not understand the request. human decision required.",
+            "payload": {
+              "type": "critical_fail",
+              "reason": "translation_conflict",
+              "slot_1_normalized": "object",
+              "slot_2_normalized": "object"
+            }
+          }
+        }
+      },
+      "comparator": {
+        "owner": "translation_layer",
+        "placement": "between slot_1 output and plan_analysis_initial — runs only when selective_redundancy triggers",
+        "normalization": {
+          "fields": ["intent", "action_types"],
+          "action_types_derivation": "sorted list of action values from plan steps",
+          "excluded": ["argument ordering", "field naming", "formatting", "risk labels"]
+        },
+        "comparison": {
+          "match_requires": ["intent equality", "action_types equality"],
+          "matching": "exact — no fuzzy, no semantic similarity",
+          "on_match": "pass validated plan to plan_analysis_initial",
+          "on_mismatch": "critical_fail → escalate_to_user"
+        }
+      },
+      "selective_redundancy": {
+        "trigger": "plan_analysis_initial.operation_flags.write.value == true OR plan_analysis_initial.operation_flags.delete.value == true OR plan_analysis_initial.state_flags.state_change.value == true",
+        "action": "invoke slot_2 with original_input → run comparator → proceed or critical_fail",
+        "placement": "after plan_analysis_initial, before plan_analysis_final"
+      },
+      "output_schema": {
+        "intent": ["single_action", "multi_step", "read_only", "destructive"],
+        "steps": [
+          {
+            "id": "string",
+            "action": "string",
+            "args": "object",
+            "risk": "low|medium|high"
+          }
+        ]
+      }
+    },
+
+    "plan_analysis_initial": {
+      "role": "pass 1 — extract deterministic facts from validated plan. no interpretation, no heuristics beyond raw term extraction.",
+      "input": "validated structured plan from translation_layer",
+      "precondition": {
+        "plan_structure_valid": true,
+        "on_invalid": "reject"
+      },
+      "rules": [
+        "based only on action types, args, and step count",
+        "no inference beyond direct mapping",
+        "no intent signals — those belong to pass 2",
+        "raw_terms_detected is a staging field for pass 2 only — not interpreted here"
+      ],
+      "output": {
+        "operation_flags": {
+          "read": {"value": "bool", "source": "action_type"},
+          "write": {"value": "bool", "source": "action_type"},
+          "delete": {"value": "bool", "source": "action_type"}
+        },
+        "state_flags": {
+          "state_change": {"value": "bool"},
+          "multi_step": {"value": "bool"},
+          "idempotent": {"value": "bool"},
+          "bounded_operation": {"value": "bool", "source": "args_constraints"}
+        },
+        "raw_terms_detected": {
+          "value": ["string"],
+          "source": "lexical scan of action descriptions, args, and file paths",
+          "note": "staging only — not interpreted at this pass"
+        }
+      }
+    },
+
+    "plan_analysis_final": {
+      "role": "pass 2 — interpret facts from pass 1. adds intent signals. facts from pass 1 are immutable.",
+      "input": "plan_analysis_initial output",
+      "invariant": "cannot modify operation_flags or state_flags — interpretation only, facts are sealed",
+      "implicit_destructive_detection": {
+        "description": "three-step gate — all three must pass before implicit_destructive is flagged true",
+        "step_1_lexical_match": {
+          "terms": ["clean", "clear", "remove", "prune", "reset", "purge", "wipe", "flush"],
+          "source": "raw_terms_detected from pass 1"
+        },
+        "step_2_scope_gate": {
+          "condition": "operation_flags.write.value == true OR operation_flags.delete.value == true",
+          "note": "term match without write/delete scope does not trigger — eliminates 'clear explanation', 'clean up my essay' false positives"
+        },
+        "step_3_argument_context": {
+          "condition": "matched term appears in file paths, command args, or action descriptions",
+          "not_in": "user commentary, unrelated text fields"
+        },
+        "output_on_pass": {
+          "implicit_destructive": {
+            "value": true,
+            "source": "term_match + write_scope + argument_context"
+          }
+        },
+        "output_on_fail": {
+          "implicit_destructive": {
+            "value": false,
+            "source": "gate_not_passed"
+          }
+        }
+      },
+      "output": {
+        "operation_flags": "inherited from plan_analysis_initial — immutable",
+        "state_flags": "inherited from plan_analysis_initial — immutable",
+        "intent_signals": {
+          "implicit_destructive": {"value": "bool", "source": "three_step_gate"},
+          "explicit_destructive": {"value": "bool", "source": "action_type"}
+        }
+      },
+      "high_risk_step_detection": {
+        "source": "plan_analysis_final — not model-assigned risk labels",
+        "triggers": [
+          "step contains delete action",
+          "step contains write action",
+          "step contains state_change"
+        ],
+        "note": "model risk labels in plan steps are advisory only — plan_analysis flags are authoritative"
+      }
+    },
+
+    "router": {
+      "type": "local_model",
+      "role": "advisory classification only",
+      "outputs": {
+        "route": "inline|orchestrator|tool|reject",
+        "confidence": "float",
+        "risk": "low|medium|high"
+      },
+      "rules": [
+        "advisory_only",
+        "plan_analysis_overrides"
+      ]
+    },
+
+    "decision_engine": {
+      "role": "final authority — no model touches this layer",
+      "inputs": ["router_output", "plan_analysis_final_output", "source_metadata"],
+      "rules": [
+        "if plan_analysis_final.operation_flags.delete.value == true AND plan_analysis_final.intent_signals.explicit_destructive.value != true → require_confirmation",
+        "if plan_analysis_final.intent_signals.implicit_destructive.value == true → require_confirmation",
+        "if plan invalid → reject"
+      ],
+      "loss_aversion_rules": {
+        "source": "Behavioral_RL — prospect theory asymmetry",
+        "principle": "potential downside weighted heavier than equivalent upside — asymmetric confirmation thresholds",
+        "phase": "phase_1 — explicit rules only. scoring layer deferred to phase_2 after runtime data collected.",
+        "rules": [
+          "if action is irreversible → require_confirmation regardless of risk rating",
+          "if action affects system config → require_confirmation regardless of confidence",
+          "if router.confidence < 0.7 AND plan_analysis_final.state_flags.state_change.value == true → require_confirmation",
+          "if plan_analysis_final.state_flags.multi_step.value == true AND any step flagged high-risk by plan_analysis_final → confirm before each high-risk step not just at plan level",
+          "if action_type unknown → reject, never assume safe"
+        ],
+        "hard_rules": [
+          "unknown_action → always reject",
+          "irreversible_action → always confirm — never scored away"
+        ],
+        "escalation_asymmetry": {
+          "description": "cost of asking when unnecessary < cost of acting when wrong",
+          "policy": "bias toward confirmation on any ambiguity — false positives acceptable, false negatives are not"
+        },
+        "phase_2_note": "after runtime data: add scoring layer on top of rules, not replacing them. log confirmation events with user_action and was_it_correct to build calibration dataset."
+      },
+      "source_aware_gating": {
+        "description": "decision_engine consumes source_metadata to apply capability-aware gates",
+        "discord_example": "read_only capability → reject write/execute plans regardless of plan_analysis output"
+      }
+    },
+
+    "dry_run": {
+      "role": "simulate plan effects before execution",
+      "output": {
+        "summary": {
+          "files_read": [],
+          "files_written": [],
+          "files_deleted": []
+        },
+        "flags": {
+          "implicit_destructive": "bool",
+          "multi_step": "bool"
+        }
+      },
+      "user_action": {
+        "approve": "proceed to execution",
+        "reject_and_rephrase": "return to user — system restarts clean with new input",
+        "kill": "terminate plan entirely — no execution",
+        "modify": {
+          "type": "natural_language_revision",
+          "action": "send_to_translation_layer",
+          "context": [
+            "original_input",
+            "original_plan",
+            "user_modification"
+          ],
+          "revision_loop": {
+            "max_depth": 3,
+            "revision_tracking": {
+              "attempts": [
+                {
+                  "attempt": "int",
+                  "failure_reasons": ["string"]
+                }
+              ],
+              "aggregated_failure_reasons": ["string"],
+              "note": "attempts[] preserves timeline — aggregated shows what never resolved"
+            },
+            "on_depth_exceeded": {
+              "action": "kill_and_escalate",
+              "include": [
+                "last_plan",
+                "revision_tracking.attempts",
+                "revision_tracking.aggregated_failure_reasons",
+                "suggestion: manual_rephrase_required"
+              ]
+            }
+          }
+        }
+      }
+    },
+
+    "orchestrator": {
+      "role": "execute multi-step plans",
+      "step_interruptibility": {
+        "non_interruptible": ["file_write", "state_mutation"],
+        "interruptible": ["read", "list"]
+      }
+    },
+
+    "permission_layer": {
+      "policy": {
+        "file_read": "allow",
+        "file_write": "allow_with_scope",
+        "system_change": "deny"
+      }
+    },
+
+    "command_builder": {
+      "allowed_actions": {
+        "read_file": ["cat {path}"],
+        "list_dir": ["ls {path}"]
+      }
+    },
+
+    "execution_layer": {
+      "environment": "sandboxed",
+      "timeout_seconds": 10
+    }
+  },
+
+  "execution_flow": [
+    "entry_point (cli | claude_interface | discord_transport)",
+    "normalize_to_entry_point_schema",
+    "input_guard",
+    "translation_layer → slot_1 → plan",
+    "plan_analysis_initial (facts only)",
+    "selective_redundancy gate — if write/delete/state_change: invoke slot_2 with original_input → comparator → match or critical_fail",
+    "plan_analysis_final (interpretation only — facts immutable)",
+    "observer_log",
+    "decision_engine (inputs: router_output + plan_analysis_final_output + source_metadata)",
+    "dry_run",
+    "user_action (approve | modify | reject_and_rephrase | kill)",
+    "execution"
+  ]
+}
