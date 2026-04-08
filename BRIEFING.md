@@ -55,8 +55,8 @@ entry_point (cli | discord | interface)
 ### Slot Chain
 | Slot | Model | Role | Temp |
 |------|-------|------|------|
-| 1 | Qwen2.5 14B local (Ollama) | Primary | 0.2 |
-| 2 | Qwen2.5 14B local (Ollama) | Independent validator | 0.3 |
+| 1 | Qwen2.5 7B local (Ollama, Q4_K_M) | Primary | 0.2 |
+| 2 | Qwen2.5 7B local (Ollama, Q4_K_M) | Independent validator | 0.3 |
 | 3 | Claude API | Last resort — schema failure only | — |
 
 **Slot 2 receives original_input — never slot_1 output. Independence is the point.**
@@ -228,7 +228,7 @@ When confirmations become noise. That's a calibration problem. Phase 4 tracks de
 | Wolfie (desktop) | Training | RTX 4080 Super 16GB, Ryzen 7800X3D, 64GB RAM |
 
 **Training:** Wolfie. Unsloth + QLoRA + DPO. Export GGUF. Transfer via SCP to Parrot.
-**Inference:** Parrot. Ollama. Qwen2.5 14B at Q4 quant.
+**Inference:** Parrot. Ollama. Qwen2.5 7B at Q4_K_M (~4.5GB VRAM, 3.5GB headroom on 4060).
 
 ---
 
