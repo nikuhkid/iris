@@ -1,0 +1,6 @@
+{
+  "$comment": "Phase 1 action vocabulary. Expand as testing surfaces new action strings. Anything not listed here is unknown — decision engine rejects unknown actions. summarize_text classified as read — it does not mutate state. Edge case: if summarize_text appears with write-type args (e.g. output_path), revisit classification in Phase 2.",
+  "read": ["read_file", "list_dir", "query_db", "search", "summarize_text"],
+  "write": ["write_file", "store_memory", "update_db", "append_file"],
+  "delete": ["delete_file", "remove_entry", "purge"]
+}
