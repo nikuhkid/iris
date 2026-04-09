@@ -255,3 +255,17 @@ Neither repo has implementation code yet. Phase 1 is the starting point.
 
 *Last updated: April 8, 2026*
 *Session: context-window-limited — this doc is the handoff*
+
+---
+
+## Phase 1 Results — April 9, 2026
+
+**Exit criteria: PASS**
+
+- Valid JSON: 50/50 (100%)
+- Schema conformance: 48/50 (96%) — both failures were `cannot_plan` structured responses, correct behavior
+- Failures: "Save this" and "Update everything" — genuinely ambiguous, model correctly declined
+- Vocabulary drift: 33 unknown action strings logged in `exit_criteria_p1_results.json`
+
+**Phase 2 day one:** classify the 33 unknown action strings into `action_map.json`. Do not touch `implicit_destructive_terms` until input variation testing surfaces actual detection misses. These are separate concerns — do not conflate them.
+
