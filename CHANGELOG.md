@@ -353,3 +353,13 @@ summarize_json, update_database, update_timestamp
 
 ### Phase 1 Status: COMPLETE ✅
 All exit criteria passed. Pipeline proven end-to-end. Moving to Phase 2.
+
+### Commit `1ece3e6` — Phase 1 exit criteria test
+3 files, 715 insertions.
+- `tests/exit_criteria_p1.py` — test runner
+- `tests/exit_criteria_p1_results.json` — raw results
+- `CHANGELOG.md` — updated
+
+### Session wrap
+Phase 1 complete and closed. Next session starts at Phase 2.
+Phase 2 entry point: retry logic, basic logging, vocabulary drift classification from `tests/exit_criteria_p1_results.json` (33 unknown action strings).
