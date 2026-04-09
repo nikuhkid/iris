@@ -363,3 +363,12 @@ All exit criteria passed. Pipeline proven end-to-end. Moving to Phase 2.
 ### Session wrap
 Phase 1 complete and closed. Next session starts at Phase 2.
 Phase 2 entry point: retry logic, basic logging, vocabulary drift classification from `tests/exit_criteria_p1_results.json` (33 unknown action strings).
+
+### Clarification logged — Phase 2 scope
+Two separate concerns, do not conflate:
+
+**`action_map.json`** — maps action strings the model produces to operation types (read/write/delete/unknown).
+The 33 unknown action strings from Phase 1 exit criteria feed this. Phase 2 day one: classify and populate.
+
+**`implicit_destructive_terms`** — lexical scan of raw user input phrasing.
+Does NOT expand from the 33 unknowns. Only changes if Phase 2 input variation testing surfaces phrasing that should have triggered the gate but didn't. Leave untouched until then.
