@@ -309,3 +309,47 @@ cd /home/nikuhkid/iris && python3 -m iris.pipeline "Purge the cache directory at
 
 ### Commit `c7be5b9` → Phase 1 complete
 12 files, 755 insertions. All Phase 1 tasks built, tested individually and end-to-end.
+
+---
+
+## Phase 1 Exit Criteria Test — 2026-04-09
+
+### Test Runner (`tests/exit_criteria_p1.py`)
+50 prompts across 5 categories: simple reads (10), writes (10), deletes/destructive (10), multi-step (10), ambiguous/edge (10).
+Records per prompt: valid_json, valid_schema, intent, unknown_actions, error.
+Raw results saved to `tests/exit_criteria_p1_results.json`.
+
+**Run:**
+```bash
+cd /home/nikuhkid/iris && python3 tests/exit_criteria_p1.py
+```
+
+### Results
+```
+Total prompts:        50
+Valid JSON:           50/50 (100.0%)   PASS
+Schema conformance:   48/50 (96.0%)   PASS
+Exit threshold:       90%
+```
+
+### Failures (2)
+Both `cannot_plan` — correct structured failure response, not schema violations.
+- [43] "Save this" — too ambiguous, no actionable args
+- [44] "Update everything" — too ambiguous, no actionable args
+
+Model correctly admitted it could not plan rather than hallucinating a plausible plan. Better than a schema violation.
+
+### Vocabulary Drift — 33 unique unknown action strings
+Phase 2 day one material. Do not add to action_map.json until Phase 2 classification pass.
+```
+append_to_file, clean, clean_directory, clean_text, database.prune, delete,
+delete_files, edit_configuration, edit_file, file_delete, file_operation,
+file_overwrite, file_system.wipe_directory, file_system_operation, flush_store,
+get_logs, list_directory, modify_yaml, process_data, purge_directory,
+query_database, read_files, remove_file, save_to_file, save_url_to_file,
+search_engine_query, search_web, shell_command, store, store_result,
+summarize_json, update_database, update_timestamp
+```
+
+### Phase 1 Status: COMPLETE ✅
+All exit criteria passed. Pipeline proven end-to-end. Moving to Phase 2.

@@ -1,0 +1,484 @@
+[
+  {
+    "prompt": "Read the file at /tmp/notes.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "List the contents of /home/nikuhkid/documents",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [
+      "list_directory"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "What's in /etc/hosts?",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "Show me the contents of /tmp/config.yaml",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "Read /var/log/syslog",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "List all files in /tmp",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [
+      "list_directory"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "What files are in /home/nikuhkid?",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [
+      "shell_command"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Read the file /tmp/data.json",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "Show me what's inside /tmp/output.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "List the directory /home/nikuhkid/iris",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [
+      "shell_command"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Save the text 'hello world' to /tmp/hello.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "Update /tmp/config.yaml with the key debug set to true",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "edit_file"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Store the result to /tmp/output.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "store"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Write the string 'done' to /tmp/status.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "Append the log entry 'started' to /tmp/app.log",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "append_to_file"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Save user preferences to /tmp/prefs.json",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "save_to_file"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Update the database entry for user id 42",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "update_database"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Store the search results to /tmp/results.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "store"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Write the summary to /tmp/summary.md",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "Save the processed data to /tmp/processed.json",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "save_to_file"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Remove the file /tmp/old.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "remove_file"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Clean up the log files in /tmp/logs",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "clean_directory"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Purge all entries in the cache directory",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "purge_directory"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Wipe the contents of /tmp/scratch",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "file_system.wipe_directory"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Delete /tmp/test.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "file_delete"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Remove all files older than 7 days in /tmp",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "file_system_operation"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Clear the temp directory at /tmp/cache",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "file_system_operation"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Prune old database entries from last month",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "database.prune"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Reset the config file at /tmp/config.yaml to defaults",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "file_overwrite"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Flush the session store",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "flush_store"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Search for Python tutorials and save the results to /tmp/results.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "search_web",
+      "save_to_file"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Read /tmp/data.json and summarize its contents",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [
+      "summarize_json"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "List the files in /tmp and delete any that end in .log",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "multi_step",
+    "unknown_actions": [
+      "list_directory",
+      "delete_files"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Read /tmp/input.txt then write the uppercase version to /tmp/output.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "multi_step",
+    "unknown_actions": [],
+    "error": null
+  },
+  {
+    "prompt": "Search for recent news about AI and store the top result to /tmp/news.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "search_web",
+      "store_result"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Read the config at /tmp/config.yaml and update the debug flag to false",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "multi_step",
+    "unknown_actions": [
+      "modify_yaml"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "List /tmp, read each .txt file, and summarize all contents",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "multi_step",
+    "unknown_actions": [
+      "shell_command",
+      "read_files"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Query the database for user 42 then update their last_seen timestamp",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "multi_step",
+    "unknown_actions": [
+      "query_database",
+      "update_timestamp"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Read /tmp/report.md and save a cleaned version to /tmp/report_clean.md",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "multi_step",
+    "unknown_actions": [
+      "clean_text"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Search for 'ollama documentation' and save the first result url to /tmp/links.txt",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "search_engine_query",
+      "save_url_to_file"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Do the thing with the file",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "file_operation"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Clean it up",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "clean"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Save this",
+    "valid_json": true,
+    "valid_schema": false,
+    "intent": null,
+    "unknown_actions": [],
+    "error": "cannot_plan"
+  },
+  {
+    "prompt": "Update everything",
+    "valid_json": true,
+    "valid_schema": false,
+    "intent": null,
+    "unknown_actions": [],
+    "error": "cannot_plan"
+  },
+  {
+    "prompt": "Remove the old stuff",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "delete_files"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Process the data",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "process_data"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Fix the config",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "edit_configuration"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Get me the logs",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "read_only",
+    "unknown_actions": [
+      "get_logs"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Store it somewhere",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "single_action",
+    "unknown_actions": [
+      "store"
+    ],
+    "error": null
+  },
+  {
+    "prompt": "Delete that",
+    "valid_json": true,
+    "valid_schema": true,
+    "intent": "destructive",
+    "unknown_actions": [
+      "delete"
+    ],
+    "error": null
+  }
+]
