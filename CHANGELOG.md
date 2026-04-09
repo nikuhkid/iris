@@ -266,3 +266,9 @@ iris/
     ├── decision_engine.py
     └── response_model_stub.py
 ```
+
+### Housekeeping
+- Added `.gitignore` — excludes `__pycache__/`, `*.pyc`, `*.pyo`, `.env`, build artifacts
+- Committed and pushed to GitHub: commit `6b4166e`
+  - 12 files, 755 insertions
+  - Branch: main
