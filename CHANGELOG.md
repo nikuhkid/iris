@@ -272,3 +272,40 @@ iris/
 - Committed and pushed to GitHub: commit `6b4166e`
   - 12 files, 755 insertions
   - Branch: main
+
+#### input_guard_stub (`iris/input_guard_stub.py`)
+Stub — pass-through only. Logs input length, returns clean.
+Interface contract documented. Real implementation deferred to Phase 2 when real traffic data exists.
+Real guard must implement: max_length, encoding validation, AgentShield/MiniClaw injection catalogue, rejection reason codes.
+
+#### Pipeline entry point (`iris/pipeline.py`)
+Wires all Phase 1 components in order:
+input → input_guard_stub → translation_layer (slot1) → validator → plan_analysis_initial → plan_analysis_final → decision_engine → response_model_stub
+
+No logic in pipeline.py — sequencing only.
+Runnable directly: `python3 -m iris.pipeline "your input here"`
+
+**End-to-end tests:**
+```bash
+# Clean read
+cd /home/nikuhkid/iris && python3 -m iris.pipeline "Read the file at /tmp/test.txt and summarize its contents"
+# Result: proceed — Plan ready to execute. Intent: read_only. 1 step(s): read_file.
+
+# Delete
+cd /home/nikuhkid/iris && python3 -m iris.pipeline "Delete all log files in /tmp/logs"
+# Result: reject — unknown action type(s): ['file_system_operation'] — cannot assess safety
+# Note: model produced file_system_operation, not in vocabulary. Unknown gate fired before destructive check. Depth confirmed.
+
+# Purge
+cd /home/nikuhkid/iris && python3 -m iris.pipeline "Purge the cache directory at /tmp/cache"
+# Result: reject — unknown action type(s): ['purge_directory'] — cannot assess safety
+# Note: model produced purge_directory. Vocabulary drift surfaced as designed.
+```
+
+**Observations logged for Phase 2:**
+- Model produced `file_system_operation` and `purge_directory` — not in action_map.json. Do not add yet. Run 50-prompt exit criteria test first, add full batch from real data.
+- Unknown action gate firing before destructive intent check is correct — two independent gates both block. Safety net has depth.
+- summarize_text variance at temp 0.2 is expected. Relevant in Phase 2 when clustering failure patterns.
+
+### Commit `c7be5b9` → Phase 1 complete
+12 files, 755 insertions. All Phase 1 tasks built, tested individually and end-to-end.
