@@ -9,10 +9,10 @@ Phase 1 — explicit rules only. Scoring layer deferred to Phase 2.
 """
 
 # Actions considered irreversible — always confirm regardless of risk rating
-IRREVERSIBLE_ACTIONS = {"delete_file", "remove_entry", "purge"}
+IRREVERSIBLE_ACTIONS = {"delete_file", "remove_entry", "purge", "file_overwrite", "file_write"}
 
 # Actions that affect system config — always confirm
-SYSTEM_CONFIG_ACTIONS = {"update_config", "write_config", "modify_fstab", "systemctl"}
+SYSTEM_CONFIG_ACTIONS = {"update_config", "write_config", "modify_fstab", "systemctl", "edit_configuration"}
 
 
 def decide(analysis: dict, plan: dict) -> dict:

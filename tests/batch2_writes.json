@@ -1,0 +1,138 @@
+[
+  {
+    "prompt": "write 'done' to /tmp/status.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "dump this to /tmp/out.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "save to /tmp/result.json",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "save"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "append 'started' to /tmp/app.log",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "file_append"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "store the output in /tmp/output.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "write the config back to /tmp/config.yaml",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "update user 42 last_seen",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "update_user_field"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "push the result to /tmp/results.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "save prefs to /tmp/prefs.json",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "file_write"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "log this to /tmp/iris.log",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "log"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "write summary to /tmp/summary.md",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "save processed data to /tmp/processed.json",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "file_write"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "update debug to false in /tmp/config.yaml",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "yaml_edit"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "store it in /tmp/cache/result.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "file_write"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "write the cleaned version to /tmp/report_clean.md",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  }
+]

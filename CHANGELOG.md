@@ -372,3 +372,88 @@ The 33 unknown action strings from Phase 1 exit criteria feed this. Phase 2 day 
 
 **`implicit_destructive_terms`** — lexical scan of raw user input phrasing.
 Does NOT expand from the 33 unknowns. Only changes if Phase 2 input variation testing surfaces phrasing that should have triggered the gate but didn't. Leave untouched until then.
+
+---
+
+## Session 2 — 2026-04-10
+
+### Phase 2 — Day 1: Vocabulary Classification & Input Variation Testing
+
+#### action_map.json — Phase 1 unknowns classified
+
+33 unknown action strings from Phase 1 exit criteria classified and added.
+4 intentionally left unknown (catch-alls, no safe classification possible):
+- `file_system_operation`, `file_operation`, `process_data`, `shell_command`
+
+**Decisions logged:**
+- `file_overwrite` → write + `IRREVERSIBLE_ACTIONS` (write semantics, previous content unrecoverable)
+- `edit_configuration` → write + `SYSTEM_CONFIG_ACTIONS` (targets config files, always confirm)
+- `summarize_json`, `list_directory`, `read_files`, `get_logs`, `search_web`, `search_engine_query`, `query_database` → read
+- `save_to_file`, `save_url_to_file`, `store_result`, `store`, `append_to_file`, `update_database`, `update_timestamp`, `modify_yaml`, `edit_file` → write
+- `remove_file`, `delete_files`, `file_delete`, `delete`, `purge_directory`, `file_system.wipe_directory`, `flush_store`, `database.prune`, `clean_directory`, `clean` → delete
+
+#### decision_engine.py — updated constants
+- `file_overwrite` added to `IRREVERSIBLE_ACTIONS`
+- `edit_configuration` added to `SYSTEM_CONFIG_ACTIONS`
+
+---
+
+#### Input Variation Testing — 80 prompts across 4 batches
+
+Test runner: `tests/input_variation_p2.py`
+Prompt style: Niku register — shorthand, direct, no corporate phrasing.
+80 prompts: reads (15), writes (15), destructive (20), multi-step + ambiguous (30).
+Results saved per batch: `tests/batch1_reads.json`, `batch2_writes.json`, `batch3_destructive.json`, `batch4_multistep_ambiguous.json`
+
+**Run per batch:**
+```bash
+cd /home/nikuhkid/iris && python3 tests/input_variation_p2.py
+```
+
+**Key findings:**
+
+Schema failures: 0 — model produced valid JSON throughout.
+`cannot_plan`: 2 — "nuke that", "torch it" — too ambiguous, no target.
+
+Vocabulary drift surfaced — new unknowns by category:
+- Read aliases: `file_read`, `file_dump`, `file_peek`, `cat`, `os.listdir`, `tail`, `file_search`, `summarize_content`
+- Write aliases: `file_write`, `file_append`, `save`, `log`, `yaml_edit`, `json_update_key`, `append_text_to_file`, `write_log`, `file_transform`
+- Delete aliases: `os.remove`, `clear_cache`, `cache.purge`, `db_wipe`, `remove_directory`, `clean_up`, `zero_out`, `disk_wipe`
+- DB variants: `db.query` (read), `db.update` (write)
+- Destructive without context: `system_reset`
+- Stay unknown: `execute_command`, `shell_command`, `network`, `update_user_field`, `json_parse`, `parse_yaml`
+
+Implicit destructive gate — hits: `kill`, `clear`, `trash`, `blow away`, `clean it up`, `get rid of it`, `blow it away`, `drop the old stuff`
+
+Slips (destructive, gate missed):
+- `chuck` → proceeded (model produced known action, term not in scope)
+- `zero out` → proceeded (same)
+- `tidy /tmp/logs` → proceeded (model didn't produce write/delete action, scope gate didn't fire)
+
+Notable misreads:
+- `gut` → `file_read` (twice) — model completely misread intent
+- `flush` → `network` — unrelated
+- `nuke` → `execute_command` — treated as shell call
+
+**Decisions from results:**
+
+`file_write` — consistent across batches (4+ occurrences). Classified as write + `IRREVERSIBLE_ACTIONS`. Cannot distinguish new file vs overwrite from action string alone — asymmetry favours confirmation.
+
+`chuck`, `zero`, `tidy`, `trim` — added to `implicit_destructive_terms`. Context-dependent but structurally dangerous without sufficient information.
+
+`tidy` still slipping — scope gate doesn't fire if model doesn't produce write/delete action. Model behaviour problem, not gate problem. Deferred to Phase 6 system prompt tuning.
+
+`nuke`, `gut`, `blow away`, `torch` — explicitly destructive, not implicit. No change to implicit_destructive_terms for these.
+
+#### Files updated this session
+- `config/action_map.json` — expanded with all classified unknowns from P1 + P2 testing
+- `iris/decision_engine.py` — `file_write` added to `IRREVERSIBLE_ACTIONS`
+- `iris/plan_analysis_final.py` — `chuck`, `zero`, `tidy`, `trim` added to `IMPLICIT_DESTRUCTIVE_TERMS`
+- `tests/input_variation_p2.py` — new test runner (80 prompts, 4 batches)
+- `tests/batch1_reads.json` — batch 1 raw results
+- `tests/batch2_writes.json` — batch 2 raw results
+- `tests/batch3_destructive.json` — batch 3 raw results
+- `tests/batch4_multistep_ambiguous.json` — batch 4 raw results
+
+#### Phase 2 status — IN PROGRESS
+Remaining: retry logic (max 2 on schema failure), logging (all inputs + outputs).

@@ -6,6 +6,7 @@ Facts from pass 1 are immutable — this pass cannot modify them.
 """
 
 IMPLICIT_DESTRUCTIVE_TERMS = {
+    "chuck", "zero", "tidy", "trim",
     "clean", "clear", "remove", "prune", "reset", "purge", "wipe", "flush"
 }
 

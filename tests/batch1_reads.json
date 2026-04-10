@@ -1,0 +1,138 @@
+[
+  {
+    "prompt": "grab /tmp/notes.txt",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "file_read"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "what's in /etc/hosts",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "check /var/log/syslog",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "pull the config from /tmp/config.yaml",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "show me /tmp/data.json",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "list /tmp",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "shell_command"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "what's in /home/nikuhkid/iris",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "dump /tmp/output.txt",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "file_dump"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "read /tmp/report.md",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "get the logs from /var/log/iris.log",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "cat /tmp/status.txt",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "execute_command"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "peek at /tmp/prefs.json",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "file_peek"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "list /home/nikuhkid/documents",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "shell_command"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "check what's in /tmp/cache",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "os.listdir"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "show /etc/iris/config.yaml",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [
+      "cat"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  }
+]

@@ -1,0 +1,282 @@
+[
+  {
+    "prompt": "read /tmp/data.json and save the summary to /tmp/summary.md",
+    "valid": true,
+    "intent": "read_only",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "list /tmp and nuke anything ending in .log",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "shell_command",
+      "shell_command"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "grab /tmp/input.txt and write the uppercase version to /tmp/output.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "file_transform"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "check /tmp/config.yaml and flip debug to false",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "read /tmp/report.md then dump a clean version to /tmp/report_clean.md",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "list /home/nikuhkid/iris, read every .py file, summarize",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "shell_command",
+      "file_search",
+      "summarize_content"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "query db for user 42 then update their last_seen",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "db.query",
+      "db.update"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "search ollama docs and save the url to /tmp/links.txt",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "pull /var/log/iris.log and store the last 50 lines in /tmp/tail.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "tail"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "read /tmp/prefs.json, update the theme key to dark, write it back",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "file_read",
+      "json_update_key",
+      "file_write"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "list /tmp, delete .tmp files, log deleted paths to /tmp/cleanup.log",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "shell_command",
+      "shell_command",
+      "shell_command"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "grab /tmp/data.json, parse it, save cleaned version to /tmp/clean.json",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "file_read",
+      "json_parse",
+      "file_write"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "read /tmp/notes.txt and append a timestamp to /tmp/log.txt",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "append_text_to_file"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "check /tmp/config.yaml then wipe it if debug is true",
+    "valid": true,
+    "intent": "multi_step",
+    "unknown": [
+      "parse_yaml"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "pull the last 100 lines of /var/log/syslog and dump to /tmp/syslog_tail.txt",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "tail"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "clean it up",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "require_confirmation",
+    "impl_dest": true
+  },
+  {
+    "prompt": "nuke that",
+    "valid": false,
+    "error": "cannot_plan"
+  },
+  {
+    "prompt": "sort out /tmp",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "shell_command"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "fix the config",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "require_confirmation",
+    "impl_dest": false
+  },
+  {
+    "prompt": "clear the junk",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "clean_up"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "get rid of it",
+    "valid": true,
+    "intent": "destructive",
+    "unknown": [],
+    "verdict": "require_confirmation",
+    "impl_dest": false
+  },
+  {
+    "prompt": "tidy /tmp/logs",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [],
+    "verdict": "proceed",
+    "impl_dest": false
+  },
+  {
+    "prompt": "blow it away",
+    "valid": true,
+    "intent": "destructive",
+    "unknown": [],
+    "verdict": "require_confirmation",
+    "impl_dest": false
+  },
+  {
+    "prompt": "reset that",
+    "valid": true,
+    "intent": "destructive",
+    "unknown": [
+      "system_reset"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "wipe it",
+    "valid": true,
+    "intent": "destructive",
+    "unknown": [
+      "disk_wipe"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "flush",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "network"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "drop the old stuff",
+    "valid": true,
+    "intent": "destructive",
+    "unknown": [],
+    "verdict": "require_confirmation",
+    "impl_dest": false
+  },
+  {
+    "prompt": "gut the cache",
+    "valid": true,
+    "intent": "destructive",
+    "unknown": [
+      "clear_cache"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  },
+  {
+    "prompt": "torch it",
+    "valid": false,
+    "error": "cannot_plan"
+  },
+  {
+    "prompt": "zero it out",
+    "valid": true,
+    "intent": "single_action",
+    "unknown": [
+      "zero_out"
+    ],
+    "verdict": "reject",
+    "impl_dest": false
+  }
+]

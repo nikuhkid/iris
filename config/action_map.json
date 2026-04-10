@@ -1,6 +1,28 @@
 {
-  "$comment": "Phase 1 action vocabulary. Expand as testing surfaces new action strings. Anything not listed here is unknown — decision engine rejects unknown actions. summarize_text classified as read — it does not mutate state. Edge case: if summarize_text appears with write-type args (e.g. output_path), revisit classification in Phase 2.",
-  "read": ["read_file", "list_dir", "query_db", "search", "summarize_text"],
-  "write": ["write_file", "store_memory", "update_db", "append_file"],
-  "delete": ["delete_file", "remove_entry", "purge"]
+  "$comment": "Phase 2 action vocabulary. Expanded from input variation testing. Intentionally unclassified (stay unknown): file_system_operation, file_operation, process_data, shell_command, execute_command, network, update_user_field, json_parse, parse_yaml — catch-all or context-dependent terms. file_write is write-type but irreversible — listed in write AND in IRREVERSIBLE_ACTIONS in decision_engine.py. file_overwrite same. edit_configuration is write-type but system config — listed in write AND in SYSTEM_CONFIG_ACTIONS in decision_engine.py. system_reset treated as destructive without context.",
+  "read": [
+    "read_file", "list_dir", "query_db", "search", "summarize_text",
+    "list_directory", "read_files", "summarize_json", "get_logs",
+    "search_web", "search_engine_query", "query_database",
+    "file_read", "file_dump", "file_peek", "cat", "os.listdir",
+    "tail", "file_search", "summarize_content", "db.query"
+  ],
+  "write": [
+    "write_file", "store_memory", "update_db", "append_file",
+    "save_to_file", "save_url_to_file", "store_result", "store",
+    "append_to_file", "update_database", "update_timestamp",
+    "modify_yaml", "edit_file", "edit_configuration", "file_overwrite",
+    "file_write", "file_append", "save", "log", "yaml_edit",
+    "json_update_key", "append_text_to_file", "write_log",
+    "file_transform", "db.update"
+  ],
+  "delete": [
+    "delete_file", "remove_entry", "purge",
+    "remove_file", "delete_files", "file_delete", "delete",
+    "purge_directory", "file_system.wipe_directory", "flush_store",
+    "database.prune", "clean_directory", "clean",
+    "os.remove", "clear_cache", "cache.purge", "db_wipe",
+    "remove_directory", "clean_up", "zero_out", "disk_wipe",
+    "system_reset"
+  ]
 }
