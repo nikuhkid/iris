@@ -470,3 +470,57 @@ Commit `aa4a7d5`
 
 #### Phase 2 status — IN PROGRESS
 Remaining: logging (all inputs + outputs).
+
+#### Logging — `iris/logger.py` + `iris/pipeline.py`
+
+SQLite logger. Append-only. One row per pipeline run. DB at `iris.db` in project root (gitignored).
+
+Schema designed with Phase 5 in mind — hash chain fields present from day one:
+- `previous_hash`, `entry_hash` — SHA-256 fields, null until Phase 5 populates them
+- `sequence_gap` — marks rows logged during observer degraded mode (Phase 5)
+- No ALTER TABLE needed in Phase 5 — columns are already there
+
+`iris/logger.py` — public API:
+- `init_db()` — CREATE TABLE IF NOT EXISTS, idempotent
+- `start_run(source, user_id)` — inserts skeleton row, returns UUID run_id
+- `update_run(run_id, **fields)` — updates any subset of columns. Unknown columns raise ValueError — loud, not silent. JSON fields (plan_json, analysis_initial, analysis_final) serialized automatically.
+
+`iris/pipeline.py` — logging wired at every stage via `_log()` wrapper (fire-and-forget — logger failure never takes down a run). `run_id` now returned in result dict.
+
+Fields logged per run: raw_input, guarded_input, guard_passed, slot_used, attempts, raw_model_output, valid_json, valid_schema, plan_json, analysis_initial, analysis_final, verdict, verdict_reason, pipeline_error, response.
+
+Commits: `38a8683`
+
+---
+
+#### Smoke test — `tests/smoke_test.py`
+
+Full-stack sanity check. Run at session start to confirm all components intact before touching anything.
+
+57 assertions across 6 sections:
+- validator — all 4 return cases
+- plan_analysis_initial — operation flags per action type
+- plan_analysis_final — implicit destructive gate fires and does not fire, explicit_destructive distinction, pass 1 immutability
+- decision_engine — all verdicts, rule priority (unknown fires before irreversible)
+- response_model_stub — authority language absent from all verdict paths
+- logger — row creation, field population, JSON deserialization, Phase 5 nulls, unknown column raises, run_id uniqueness
+- pipeline end-to-end (live model) — proceed and cannot_plan paths, DB row confirmed per run
+
+Exits 0 on all pass, non-zero on any failure.
+
+Result: 57/57 ✓
+
+Commit `f27c3ff`
+
+---
+
+### Phase 2 Status: COMPLETE ✅
+
+Exit criteria met:
+- Retry on schema failure (max 2) ✓
+- Log all inputs + outputs ✓
+- Cluster failures (schema vs logic vs ambiguity) ✓
+- Expand implicit_destructive lexical set based on misses ✓
+
+Next session starts at Phase 3.
+Phase 3 entry point: slot_2 with original_input isolation, comparator (intent + action_types exact match), selective redundancy trigger (write/delete/state_change only), critical_fail escalation to user.
