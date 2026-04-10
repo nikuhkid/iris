@@ -457,3 +457,16 @@ Notable misreads:
 
 #### Phase 2 status — IN PROGRESS
 Remaining: retry logic (max 2 on schema failure), logging (all inputs + outputs).
+
+#### Retry logic — `iris/pipeline.py`
+`_call_with_retry` wraps the planning model call.
+- Retries max 2 times on `invalid_json` or `schema_violation` — technical failures, different sample may succeed
+- `cannot_plan` exits immediately — ambiguous input needs clarification from user, not another attempt
+- Retry attempt number logged to stdout
+
+Smoke tested: clean read proceeds on attempt 1, `cannot_plan` exits immediately with clarification message.
+
+Commit `aa4a7d5`
+
+#### Phase 2 status — IN PROGRESS
+Remaining: logging (all inputs + outputs).
