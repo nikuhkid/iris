@@ -524,3 +524,11 @@ Exit criteria met:
 
 Next session starts at Phase 3.
 Phase 3 entry point: slot_2 with original_input isolation, comparator (intent + action_types exact match), selective redundancy trigger (write/delete/state_change only), critical_fail escalation to user.
+
+### Clarification logged — Phase 3 design decisions
+
+**Selective redundancy trigger:**
+`state_change` in `plan_analysis_initial` is already defined as `write OR delete`. So the trigger condition for slot 2 is simply `state_change: true` — not a separate check for write/delete/state_change. The BRIEFING lists all three but they collapse to one flag. No more granular condition needed.
+
+**Comparator normalization:**
+"Normalization" means sorting the action set so order doesn't matter — not semantic normalization. Exact string match on sorted lists. `["read_file", "write_file"]` == `["write_file", "read_file"]`. No fuzzy matching, no synonyms, no semantic similarity.
