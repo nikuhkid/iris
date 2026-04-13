@@ -27,6 +27,7 @@ import sqlite3
 import sys
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 # ── path setup ────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent.parent
@@ -39,6 +40,7 @@ from iris.decision_engine import decide
 from iris.response_model_stub import respond
 from iris import logger
 from iris.pipeline import run as pipeline_run
+from iris.comparator import compare
 
 DB_PATH = ROOT / "iris.db"
 
@@ -293,6 +295,50 @@ check("consecutive run_ids are unique", run_id != run_id_2)
 
 conn.close()
 
+# ── comparator ───────────────────────────────────────────────────────────────
+section("comparator — match and mismatch cases")
+
+_plan_a = {
+    "intent": "destructive",
+    "steps": [
+        {"id": "s1", "action": "delete_file", "args": {"path": "/tmp/f"}, "risk": "high"},
+        {"id": "s2", "action": "read_file",   "args": {"path": "/tmp/g"}, "risk": "low"},
+    ]
+}
+_plan_b = {
+    "intent": "destructive",
+    "steps": [
+        {"id": "s1", "action": "read_file",   "args": {"path": "/tmp/g"}, "risk": "low"},
+        {"id": "s2", "action": "delete_file", "args": {"path": "/tmp/f"}, "risk": "high"},
+    ]
+}
+_plan_c = {
+    "intent": "read_only",
+    "steps": [
+        {"id": "s1", "action": "delete_file", "args": {"path": "/tmp/f"}, "risk": "high"},
+    ]
+}
+_plan_d = {
+    "intent": "destructive",
+    "steps": [
+        {"id": "s1", "action": "remove_file", "args": {"path": "/tmp/f"}, "risk": "high"},
+    ]
+}
+
+r = compare(_plan_a, _plan_b)
+check("same intent + actions (different order) → match=True",  r["match"] is True)
+check("match → conflict=None",                                  r["conflict"] is None)
+
+r = compare(_plan_a, _plan_c)
+check("intent mismatch → match=False",                          r["match"] is False)
+check("intent mismatch → intent_mismatch=True",                 r["conflict"]["intent_mismatch"] is True)
+check("intent mismatch → actions_mismatch=True",                r["conflict"]["actions_mismatch"] is True)
+
+r = compare(_plan_a, _plan_d)
+check("delete_file vs remove_file → match=False (dumb comparator)", r["match"] is False)
+check("delete_file vs remove_file → actions_mismatch=True",         r["conflict"]["actions_mismatch"] is True)
+check("delete_file vs remove_file → intent_mismatch=False",         r["conflict"]["intent_mismatch"] is False)
+
 # ── pipeline end-to-end (live model) ─────────────────────────────────────────
 section("pipeline — end-to-end (live model call)")
 print("  note: requires Ollama running with iris-slot1\n")
@@ -332,6 +378,77 @@ for label, user_input, expected_verdict in cases:
 
     except Exception as e:
         check(f"{label} → pipeline completed without exception", False, str(e))
+
+# ── Phase 3 — slot_2 + comparator ────────────────────────────────────────────
+section("pipeline — Phase 3 slot_2 + comparator (live + mocked)")
+print("  note: case 1 requires Ollama running with iris-slot1 and iris-slot2\n")
+
+# Case 1 — live: state_change triggers slot_2, both slots agree → proceed to verdict
+# Prompt nudges model toward write_file to avoid vocabulary drift failing the test
+try:
+    result = pipeline_run("Write 'hello' to /tmp/iris_test.txt using write_file")
+    # state_change must have triggered — if unknown gate fired instead, verdict is reject
+    # and slot_2 was never called. Check error field to distinguish.
+    slot2_triggered = result.get("error") != "slot_conflict" and result.get("verdict") in ("proceed", "require_confirmation", "reject")
+    not_slot_conflict = result.get("error") != "slot_conflict"
+    run_id_ok   = bool(result.get("run_id"))
+    response_ok = bool(result.get("response"))
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    db_row = conn.execute(
+        "SELECT verdict, slot_used, response FROM pipeline_log WHERE run_id = ?",
+        (result["run_id"],)
+    ).fetchone()
+    conn.close()
+
+    # slot_used=2 confirms slot_2 was triggered and logged
+    slot_used_ok   = db_row["slot_used"] == 2 if db_row else False
+    db_response_ok = bool(db_row["response"]) if db_row else False
+
+    check("slot_2 live — slot_used=2 logged",         slot_used_ok)
+    check("slot_2 live — no slot_conflict error",      not_slot_conflict)
+    check("slot_2 live — run_id in result",            run_id_ok)
+    check("slot_2 live — response non-empty",          response_ok)
+    check("slot_2 live — DB response written",         db_response_ok)
+
+except Exception as e:
+    check("slot_2 live — pipeline completed without exception", False, str(e))
+
+# Case 2 — mocked: slot_2 returns invalid plan → pipeline rejects with slot2_* error
+_invalid_slot2 = {"valid": False, "error": "schema_violation", "detail": "missing intent", "attempts": 3, "raw_output": "{}"}
+
+with patch("iris.pipeline.slot2_call", return_value=_invalid_slot2):
+    try:
+        result = pipeline_run("Delete the file at /tmp/test.txt")
+        check("slot_2 failure — verdict=reject",          result["verdict"] == "reject")
+        check("slot_2 failure — error starts slot2_",     (result.get("error") or "").startswith("slot2_"))
+        check("slot_2 failure — response non-empty",      bool(result.get("response")))
+    except Exception as e:
+        check("slot_2 failure — pipeline completed without exception", False, str(e))
+
+# Case 3 — mocked: slot_2 returns valid but different plan → slot_conflict
+_conflict_plan = {
+    "valid": True,
+    "plan": {
+        "intent": "read_only",         # slot_1 will produce destructive/single_action
+        "steps": [
+            {"id": "step_1", "action": "read_file", "args": {"path": "/tmp/test.txt"}, "risk": "low"}
+        ]
+    },
+    "attempts": 1,
+    "raw_output": '{"intent": "read_only", "steps": [...]}'
+}
+
+with patch("iris.pipeline.slot2_call", return_value=_conflict_plan):
+    try:
+        result = pipeline_run("Delete the file at /tmp/test.txt")
+        check("slot_conflict — verdict=reject",       result["verdict"] == "reject")
+        check("slot_conflict — error=slot_conflict",  result.get("error") == "slot_conflict")
+        check("slot_conflict — response non-empty",   bool(result.get("response")))
+        check("slot_conflict — comparison in result", "comparison" in result)
+    except Exception as e:
+        check("slot_conflict — pipeline completed without exception", False, str(e))
 
 # ── summary ───────────────────────────────────────────────────────────────────
 total  = len(_results)

@@ -1,7 +1,7 @@
 """
 iris/pipeline.py
 
-Phase 2 pipeline entry point.
+Phase 3 pipeline entry point.
 Wires all components in order — no logic lives here, only sequencing.
 
 Flow:
@@ -10,14 +10,17 @@ Flow:
     → translation_layer (slot1) with retry (max 2, on invalid_json/schema_violation only)
     → validator
     → plan_analysis_initial
+    → [slot_2 + comparator if state_change: true]
     → plan_analysis_final
     → decision_engine
     → response_model_stub
 
-Retry policy:
-    - invalid_json: retry — technical failure, different sample may succeed
-    - schema_violation: retry — model produced JSON but wrong shape, worth one more try
-    - cannot_plan: no retry — ambiguous input, model made a judgment call, needs clarification from user
+Selective redundancy:
+    slot_2 is triggered only when state_change is true (write OR delete).
+    slot_2 receives original_input — never slot_1 output.
+    Mismatch → structured conflict returned to user. No auto-resolution.
+
+Retry policy delegated to model_caller.call_with_retry.
 
 Logging:
     - Every run is logged to iris.db via iris.logger
@@ -25,24 +28,17 @@ Logging:
     - Logging never raises — failures are printed and swallowed
 """
 
-import json
-import urllib.request
-from pathlib import Path
-
 from iris.input_guard_stub import guard
-from iris.validator import validate
 from iris.plan_analysis_initial import analyze as pass1
 from iris.plan_analysis_final import analyze as pass2
 from iris.decision_engine import decide
 from iris.response_model_stub import respond
+from iris.model_caller import call_with_retry
+from iris.slot2 import call as slot2_call
+from iris.comparator import compare
 from iris import logger
 
-PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "planning_system.txt"
-OLLAMA_URL  = "http://localhost:11434/api/chat"
 SLOT1_MODEL = "iris-slot1"
-MAX_RETRIES = 2
-
-RETRYABLE_ERRORS = {"invalid_json", "schema_violation"}
 
 
 def _log(run_id: str, **fields) -> None:
@@ -53,83 +49,9 @@ def _log(run_id: str, **fields) -> None:
         print(f"[pipeline] logger update failed: {e}")
 
 
-def _call_planning_model(user_input: str) -> str:
-    """Call slot1 with the planning system prompt. Returns raw model output string."""
-    system_prompt = PROMPT_PATH.read_text()
-    payload = {
-        "model": SLOT1_MODEL,
-        "stream": False,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_input}
-        ]
-    }
-    req = urllib.request.Request(
-        OLLAMA_URL,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"}
-    )
-    resp = urllib.request.urlopen(req)
-    data = json.loads(resp.read())
-    return data["message"]["content"]
-
-
-def _call_with_retry(user_input: str, run_id: str) -> dict:
-    """
-    Call planning model and validate. Retry up to MAX_RETRIES on retryable failures.
-    Returns final validation result.
-
-    Retry on: invalid_json, schema_violation
-    No retry on: cannot_plan (ambiguous input — needs user clarification, not another attempt)
-
-    Logs slot_used, attempts, raw_model_output, valid_json, valid_schema after each attempt.
-    """
-    attempts = 0
-    last_validation = None
-    last_raw = None
-
-    while attempts <= MAX_RETRIES:
-        attempt_label = f"attempt {attempts + 1}/{MAX_RETRIES + 1}"
-        print(f"[pipeline] calling planning model ({attempt_label})...")
-
-        raw = _call_planning_model(user_input)
-        last_raw = raw
-        print(f"[pipeline] raw model output: {raw}")
-
-        validation = validate(raw)
-
-        # Log after each attempt — overwrites previous attempt values, keeps last state
-        _log(
-            run_id,
-            slot_used=1,
-            attempts=attempts + 1,
-            raw_model_output=raw,
-            valid_json=1 if validation.get("valid") or validation.get("error") != "invalid_json" else 0,
-            valid_schema=1 if validation.get("valid") else 0,
-        )
-
-        if validation["valid"]:
-            if attempts > 0:
-                print(f"[pipeline] retry succeeded on {attempt_label}")
-            return validation
-
-        error = validation.get("error")
-
-        if error not in RETRYABLE_ERRORS:
-            print(f"[pipeline] {error} — no retry")
-            return validation
-
-        print(f"[pipeline] {error} — retrying ({attempt_label})")
-        last_validation = validation
-        attempts += 1
-
-    print(f"[pipeline] all {MAX_RETRIES + 1} attempts failed — last error: {last_validation.get('error')}")
-    return last_validation
-
-
 def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
     """
-    Run the full Phase 2 pipeline.
+    Run the full Phase 3 pipeline.
 
     Args:
         user_input: raw user input string
@@ -177,7 +99,15 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
         }
 
     # Stage 2 — translation layer with retry
-    validation = _call_with_retry(guarded["content"], run_id)
+    validation = call_with_retry(SLOT1_MODEL, guarded["content"])
+    _log(
+        run_id,
+        slot_used=1,
+        attempts=validation.get("attempts"),
+        raw_model_output=validation.get("raw_output"),
+        valid_json=1 if validation.get("valid") or validation.get("error") != "invalid_json" else 0,
+        valid_schema=1 if validation.get("valid") else 0,
+    )
 
     if not validation["valid"]:
         error = validation.get("error")
@@ -185,7 +115,7 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
         if error == "cannot_plan":
             response = f"Cannot plan — input is ambiguous. {detail}. Please clarify."
         else:
-            response = f"Plan invalid after {MAX_RETRIES + 1} attempts: {error} — {detail}"
+            response = f"Plan invalid after {validation.get('attempts')} attempt(s): {error} — {detail}"
         _log(run_id, pipeline_error=error, verdict="reject", response=response)
         return {
             "run_id": run_id,
@@ -204,16 +134,74 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
     analysis_initial = pass1(plan)
     _log(run_id, analysis_initial=analysis_initial)
 
-    # Stage 4 — plan_analysis_final
+    # Stage 4 — selective redundancy (slot_2 + comparator)
+    # Triggered only when state_change is true (write OR delete).
+    # slot_2 receives original_input — never slot_1 output.
+    if analysis_initial["state_flags"]["state_change"]["value"]:
+        print(f"[pipeline] state_change detected — triggering slot_2...")
+        slot2_validation = slot2_call(guarded["content"])
+        _log(run_id, slot_used=2)
+
+        if not slot2_validation["valid"]:
+            # slot_2 failed to produce a valid plan — escalate, don't proceed
+            error = slot2_validation.get("error")
+            response = (
+                f"Slot 2 validation failed ({error}) on a state-changing plan. "
+                f"Cannot confirm intent. Please clarify or retry."
+            )
+            _log(run_id, pipeline_error=f"slot2_{error}", verdict="reject", response=response)
+            return {
+                "run_id":   run_id,
+                "response": response,
+                "verdict":  "reject",
+                "plan":     None,
+                "analysis": None,
+                "error":    f"slot2_{error}"
+            }
+
+        comparison = compare(plan, slot2_validation["plan"])
+        print(f"[pipeline] comparator: match={comparison['match']}")
+
+        if not comparison["match"]:
+            conflict = comparison["conflict"]
+            parts = []
+            if conflict["intent_mismatch"]:
+                parts.append(
+                    f"intent: slot_1={comparison['slot1']['intent']!r} "
+                    f"vs slot_2={comparison['slot2']['intent']!r}"
+                )
+            if conflict["actions_mismatch"]:
+                parts.append(
+                    f"actions: slot_1={comparison['slot1']['actions']} "
+                    f"vs slot_2={comparison['slot2']['actions']}"
+                )
+            response = (
+                f"Slot conflict detected — plans disagree on {', '.join(parts)}. "
+                f"Cannot proceed without clarification."
+            )
+            _log(run_id, pipeline_error="slot_conflict", verdict="reject", response=response)
+            return {
+                "run_id":     run_id,
+                "response":   response,
+                "verdict":    "reject",
+                "plan":       None,
+                "analysis":   None,
+                "error":      "slot_conflict",
+                "comparison": comparison
+            }
+
+        print(f"[pipeline] slot_2 agrees — proceeding")
+
+    # Stage 5 — plan_analysis_final
     analysis_final = pass2(analysis_initial, plan)
     _log(run_id, analysis_final=analysis_final)
 
-    # Stage 5 — decision engine
+    # Stage 6 — decision engine
     verdict = decide(analysis_final, plan)
     print(f"[pipeline] verdict: {verdict['verdict']} — {verdict['reason']}")
     _log(run_id, verdict=verdict["verdict"], verdict_reason=verdict["reason"])
 
-    # Stage 6 — response
+    # Stage 7 — response
     response = respond(verdict, plan)
     _log(run_id, response=response["response"])
 

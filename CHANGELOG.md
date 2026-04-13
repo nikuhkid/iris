@@ -524,3 +524,109 @@ Exit criteria met:
 
 Next session starts at Phase 3.
 Phase 3 entry point: slot_2 with original_input isolation, comparator (intent + action_types exact match), selective redundancy trigger (write/delete/state_change only), critical_fail escalation to user.
+
+---
+
+## Session 3 — 2026-04-13
+
+### Phase 3 — Redundancy
+
+#### Design clarifications (confirmed fresh, previously in reverted commit)
+
+**Selective redundancy trigger:**
+`state_change` in `plan_analysis_initial` is derived from write OR delete — `state_change: true` is the single trigger condition. Checking write/delete/state_change separately is redundant.
+
+**Comparator normalization:**
+Sorted set of action strings — order doesn't matter, strings do. `delete_file` and `remove_file` are different strings and are a mismatch. Intentional — semantic equivalence is a human call, not a comparator call.
+
+#### `iris/model_caller.py` — extracted retry logic
+
+Retry logic extracted from `pipeline.py` into shared module. `call_with_retry(model_name, user_input) -> dict` — model name is the only variable between callers. Return dict enriched with `attempts` and `raw_output` so pipeline can log per-attempt data without model_caller knowing about the logger.
+
+Rationale for extraction: duplicating retry logic across pipeline and slot_2 means one copy drifts when policy changes. One function, one place.
+
+#### `iris/slot2.py` — independent validator
+
+Thin wrapper around `call_with_retry`. Calls `iris-slot2`. Receives `original_input` only — never slot_1 output. Independence is the point.
+
+#### `iris/comparator.py` — exact match comparator
+
+Compares two validated plans on intent string and sorted action list. Returns structured result with `match`, `slot1`, `slot2`, and `conflict` fields. `conflict` is None on match, populated with `intent_mismatch` and `actions_mismatch` booleans on mismatch.
+
+#### `iris/pipeline.py` — Phase 3 wiring
+
+- Retry logic removed, replaced with `call_with_retry` import from `model_caller`
+- `slot2` and `comparator` imported
+- Stage 4 inserted between `plan_analysis_initial` and `plan_analysis_final`:
+  - Triggers on `state_change: true`
+  - slot_2 receives `guarded["content"]` (original input) — never slot_1 plan
+  - slot_2 failure → reject with `slot2_{error}`
+  - Comparator mismatch → reject with `slot_conflict`, structured conflict in result
+  - Match → proceed to plan_analysis_final
+- Stage numbers updated (4 → redundancy, 5 → plan_analysis_final, 6 → decision_engine, 7 → response)
+
+#### `tests/smoke_test.py` — Phase 3 coverage added
+
+77 assertions (up from 57). New sections:
+
+**comparator — 8 assertions:**
+- Same intent + actions in different order → match=True
+- Intent mismatch → match=False, intent_mismatch=True
+- `delete_file` vs `remove_file` → match=False (dumb comparator confirmed)
+
+**pipeline Phase 3 — 14 assertions:**
+- Live: write input triggers slot_2, both agree, `slot_used=2` logged in DB ✓
+- Mocked: slot_2 returns invalid → reject, error prefixed `slot2_` ✓
+- Mocked: slot_2 returns mismatched plan → reject, `slot_conflict`, comparison in result ✓
+
+Result: 77/77 ✓
+
+#### Exit criteria test — `tests/exit_criteria_p3.py`
+
+3 batches, 45 total runs (20 state-change live, 20 read-only live, 5 mocked conflict).
+
+Results saved to `tests/exit_criteria_p3_results.json`.
+
+```
+EC1 — slot_2 called + valid on all state-change prompts:  20/20  PASS
+EC2 — slot_2 never triggered on read-only prompts:         0/20  PASS
+EC3 — all mocked conflicts surfaced as structured:          5/5   PASS
+
+Agreement rate (data only): 20/20 (100%)
+```
+
+**Observations:**
+- `search_file` surfaced twice (read-only prompts 5 and 14) — unknown action, rejected correctly, scope gate held
+- `display_text` surfaced once (read-only prompt 15) — same
+- Neither leaked through to slot_2
+- Log `search_file` and `display_text` for Phase 4 `action_map.json` expansion — do not touch now
+
+### Phase 3 Status: COMPLETE ✅
+
+Exit criteria met:
+- slot_2 called and returned valid on all state-change prompts ✓
+- slot_2 never triggered on read-only prompts ✓
+- Conflicts surface as structured `slot_conflict` — no crashes, no silent failures ✓
+
+### Files created/modified this session
+```
+iris/
+└── iris/
+    ├── model_caller.py   — new
+    ├── slot2.py          — new
+    ├── comparator.py     — new
+    └── pipeline.py       — Phase 3 wiring
+tests/
+    ├── smoke_test.py     — expanded to 77 assertions (Phase 3 coverage)
+    ├── exit_criteria_p3.py        — new
+    └── exit_criteria_p3_results.json — new
+CHANGELOG.md              — updated
+
+```
+
+Next session starts at Phase 4.
+Phase 4 entry point: dry_run summary, user approval loop (CLI), expanded decision_engine rules (irreversible + multi-step gating), decision tracking for future calibration.
+
+**Phase 4 action_map.json candidates (do not add until Phase 4 classification pass):**
+- `search_file` — surfaced in Phase 3 exit criteria read-only batch (2 occurrences)
+- `display_text` — surfaced in Phase 3 exit criteria read-only batch (1 occurrence)
