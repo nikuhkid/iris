@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS pipeline_log (
 
     verdict           TEXT,
     verdict_reason    TEXT,
+    user_action       TEXT,
 
     pipeline_error    TEXT,
     response          TEXT,
@@ -96,7 +97,7 @@ _UPDATABLE_COLUMNS = {
     "raw_input", "guarded_input", "guard_passed",
     "slot_used", "attempts", "raw_model_output", "valid_json", "valid_schema",
     "plan_json", "analysis_initial", "analysis_final",
-    "verdict", "verdict_reason",
+    "verdict", "verdict_reason", "user_action",
     "pipeline_error", "response",
     "previous_hash", "entry_hash", "sequence_gap",
 }

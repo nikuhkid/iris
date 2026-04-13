@@ -630,3 +630,126 @@ Phase 4 entry point: dry_run summary, user approval loop (CLI), expanded decisio
 **Phase 4 action_map.json candidates (do not add until Phase 4 classification pass):**
 - `search_file` — surfaced in Phase 3 exit criteria read-only batch (2 occurrences)
 - `display_text` — surfaced in Phase 3 exit criteria read-only batch (1 occurrence)
+
+---
+
+## Session 4 — 2026-04-13
+
+### Phase 4 — Control Layer
+
+#### action_map.json — Phase 3 candidates classified
+
+2 unknown action strings from Phase 3 exit criteria classified and added.
+
+**Decisions logged:**
+- `search_file` → read (filesystem read, no state change — equivalent to `file_search` already in vocabulary)
+- `display_text` → read (output only, no write, no state change)
+
+#### decision_engine.py — Rule 3 added (multi-step + state change)
+
+New Rule 3 inserted between irreversible check (Rule 2) and system config check (now Rule 4).
+Rules renumbered 1–6, default fall-through unchanged. `sf = analysis["state_flags"]` added alongside existing `op` and `sig` variables.
+
+Rule priority order (updated):
+1. Unknown action → reject
+2. Irreversible action → require_confirmation
+3. Multi-step plan with state change → require_confirmation
+4. System config action → require_confirmation
+5. Implicit destructive → require_confirmation
+6. Explicit destructive → require_confirmation
+— Default → proceed (fall-through, not a numbered rule)
+
+---
+
+#### `iris/dry_run.py` — new file
+
+Produces a structured, unambiguous summary of what a plan intends to do.
+Generated after decision_engine verdict, before user approval.
+Not display-ready — rendering is the approval loop's job.
+
+Output fields: `intent`, `step_count`, `steps` (action + target + risk per step), `operations` (reads/writes/deletes/unknowns counts), `verdict`, `verdict_reason`.
+
+`target` extracted from first string value in step args — `"no target"` if args empty.
+Operation counts derived from action_map classification, not analysis flags — per-step counts, not booleans.
+
+#### `iris/approval_loop.py` — new file
+
+CLI user approval interface. Renders dry-run summary and prompts for a decision.
+Returns structured result to caller — never re-invokes the pipeline.
+Re-invocation and depth tracking are the caller's responsibility.
+
+Actions:
+- `approve` → `{"action": "approve"}`
+- `reject` → `{"action": "reject"}`
+- `kill` → `{"action": "kill"}`
+- `modify` → `{"action": "modify", "amended_input": str}` — prompts user for amended input, returns it
+
+Invalid input re-prompts until valid choice made. Empty amended input re-prompts.
+
+**Design decision — `modify` boundary:**
+`modify` returns amended input to caller. Pipeline does not re-invoke itself. Caller owns the loop, depth tracking, and re-invocation. Clean boundary — pipeline stays stateless.
+
+#### `iris/pipeline.py` — Phase 4 wiring
+
+- `dry_run` and `approval_loop` imported
+- Stage 7 inserted after decision engine: `dry_run_summarize(verdict, plan, analysis_final)`
+- Stage 8 inserted after dry_run: `approval_prompt(dry_run)`
+  - `approve` → continues to Stage 9 (response)
+  - anything else → logs `user_action`, returns early with structured result
+  - `modify` result includes `amended_input` key
+- Stage 9 (response) renumbered from Stage 7
+- `user_action` added to all result dicts
+- `dry_run` added to all result dicts
+
+#### `iris/logger.py` — `user_action` column added
+
+- `user_action TEXT NULL` added to `_CREATE_TABLE` schema definition
+- `"user_action"` added to `_UPDATABLE_COLUMNS`
+- `iris.db` updated via `ALTER TABLE pipeline_log ADD COLUMN user_action TEXT`
+
+#### `tests/smoke_test.py` — approval_prompt mocked for automated runs
+
+Two pipeline end-to-end cases (clean read, slot_2 live) patched with `approval_prompt` returning `{"action": "approve"}` via `unittest.mock.patch` context manager. Patches are scoped — reversed automatically on exit. No permanent changes to production code.
+
+Result: 77/77 ✓ (assertion count unchanged — Phase 4 coverage in exit criteria test)
+
+#### Exit criteria test — `tests/exit_criteria_p4.py`
+
+3 batches, 25 total runs.
+
+```
+EC1 — no execution without approval:     10/10  PASS
+EC2 — reject/kill stops cleanly:         10/10  PASS
+EC3 — modify returns amended_input:       5/5   PASS
+
+Crashes: 0
+```
+
+### Phase 4 Status: COMPLETE ✅
+
+Exit criteria met:
+- No execution without approval ✓
+- Modification loop stable — amended_input returned cleanly to caller ✓
+- User control complete — approve/reject/kill/modify all wired and logged ✓
+- Decision tracking — `user_action` column in DB, logged per run ✓
+
+### Files created/modified this session
+```
+iris/
+├── config/
+│   └── action_map.json         — search_file, display_text added to read
+└── iris/
+    ├── decision_engine.py      — Rule 3 added, rules renumbered 1–6, sf variable added
+    ├── dry_run.py              — new
+    ├── approval_loop.py        — new
+    ├── pipeline.py             — Phase 4 wiring (stages 7–9), user_action logged
+    └── logger.py               — user_action column added
+tests/
+    ├── smoke_test.py           — approval_prompt mocked for automated runs
+    ├── exit_criteria_p4.py     — new
+    └── exit_criteria_p4_results.json — new
+CHANGELOG.md                    — updated
+```
+
+Next session starts at Phase 5.
+Phase 5 entry point: observer service, SHA-256 hash chaining, failure tracking, degraded mode (buffer + replay logs).

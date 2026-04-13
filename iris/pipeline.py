@@ -1,7 +1,7 @@
 """
 iris/pipeline.py
 
-Phase 3 pipeline entry point.
+Phase 4 pipeline entry point.
 Wires all components in order — no logic lives here, only sequencing.
 
 Flow:
@@ -13,6 +13,8 @@ Flow:
     → [slot_2 + comparator if state_change: true]
     → plan_analysis_final
     → decision_engine
+    → dry_run summary
+    → user approval (approve | modify | reject | kill)
     → response_model_stub
 
 Selective redundancy:
@@ -21,6 +23,11 @@ Selective redundancy:
     Mismatch → structured conflict returned to user. No auto-resolution.
 
 Retry policy delegated to model_caller.call_with_retry.
+
+User approval:
+    approve → pipeline continues to response
+    reject | kill → pipeline stops, user_action logged, result returned to caller
+    modify → amended_input returned to caller — caller owns re-invocation and depth tracking
 
 Logging:
     - Every run is logged to iris.db via iris.logger
@@ -32,6 +39,8 @@ from iris.input_guard_stub import guard
 from iris.plan_analysis_initial import analyze as pass1
 from iris.plan_analysis_final import analyze as pass2
 from iris.decision_engine import decide
+from iris.dry_run import summarize as dry_run_summarize
+from iris.approval_loop import prompt as approval_prompt
 from iris.response_model_stub import respond
 from iris.model_caller import call_with_retry
 from iris.slot2 import call as slot2_call
@@ -51,7 +60,7 @@ def _log(run_id: str, **fields) -> None:
 
 def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
     """
-    Run the full Phase 3 pipeline.
+    Run the full Phase 4 pipeline.
 
     Args:
         user_input: raw user input string
@@ -60,12 +69,15 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
 
     Returns:
         {
-            "run_id":    str,
-            "response":  str,
-            "verdict":   str,
-            "plan":      dict | None,
-            "analysis":  dict | None,
-            "error":     str | None
+            "run_id":       str,
+            "response":     str,
+            "verdict":      str,
+            "plan":         dict | None,
+            "analysis":     dict | None,
+            "dry_run":      dict | None,
+            "user_action":  str,           -- approve | reject | kill | modify
+            "amended_input": str | None,   -- only present when user_action == modify
+            "error":        str | None
         }
     """
     print(f"\n{'='*60}")
@@ -201,17 +213,43 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
     print(f"[pipeline] verdict: {verdict['verdict']} — {verdict['reason']}")
     _log(run_id, verdict=verdict["verdict"], verdict_reason=verdict["reason"])
 
-    # Stage 7 — response
+    # Stage 7 — dry-run summary
+    dry_run = dry_run_summarize(verdict, plan, analysis_final)
+
+    # Stage 8 — user approval
+    approval = approval_prompt(dry_run)
+    _log(run_id, user_action=approval["action"])
+
+    if approval["action"] != "approve":
+        response = f"Stopped at user request: {approval['action']}."
+        _log(run_id, response=response)
+        result = {
+            "run_id":        run_id,
+            "response":      response,
+            "verdict":       verdict["verdict"],
+            "plan":          plan,
+            "analysis":      analysis_final,
+            "dry_run":       dry_run,
+            "user_action":   approval["action"],
+            "error":         None
+        }
+        if approval["action"] == "modify":
+            result["amended_input"] = approval["amended_input"]
+        return result
+
+    # Stage 9 — response
     response = respond(verdict, plan)
     _log(run_id, response=response["response"])
 
     return {
-        "run_id": run_id,
-        "response": response["response"],
-        "verdict": verdict["verdict"],
-        "plan": plan,
-        "analysis": analysis_final,
-        "error": None
+        "run_id":      run_id,
+        "response":    response["response"],
+        "verdict":     verdict["verdict"],
+        "plan":        plan,
+        "analysis":    analysis_final,
+        "dry_run":     dry_run,
+        "user_action": "approve",
+        "error":       None
     }
 
 

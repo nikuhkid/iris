@@ -26,6 +26,7 @@ def decide(analysis: dict, plan: dict) -> dict:
         }
     """
     op   = analysis["operation_flags"]
+    sf   = analysis["state_flags"]
     sig  = analysis["intent_signals"]
     step_actions = {s.get("action", "") for s in plan.get("steps", [])}
 
@@ -48,7 +49,14 @@ def decide(analysis: dict, plan: dict) -> dict:
             "reason": f"irreversible action(s) detected: {sorted(irreversible)}"
         }
 
-    # Rule 3 — system config action → always confirm
+    # Rule 3 — multi-step plan with state change → always confirm
+    if sf["multi_step"]["value"] and sf["state_change"]["value"]:
+        return {
+            "verdict": "require_confirmation",
+            "reason": "multi-step plan with state change — confirm before execution"
+        }
+
+    # Rule 4 — system config action → always confirm
     sys_config = step_actions & SYSTEM_CONFIG_ACTIONS
     if sys_config:
         return {
@@ -56,14 +64,14 @@ def decide(analysis: dict, plan: dict) -> dict:
             "reason": f"system config action(s) detected: {sorted(sys_config)}"
         }
 
-    # Rule 4 — implicit destructive → require confirmation
+    # Rule 5 — implicit destructive → require confirmation
     if sig["implicit_destructive"]["value"]:
         return {
             "verdict": "require_confirmation",
             "reason": "implicit destructive intent detected"
         }
 
-    # Rule 5 — explicit destructive intent declared → require confirmation
+    # Rule 6 — explicit destructive intent declared → require confirmation
     if sig["explicit_destructive"]["value"]:
         return {
             "verdict": "require_confirmation",

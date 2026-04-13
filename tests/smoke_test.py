@@ -354,7 +354,8 @@ cases = [
 
 for label, user_input, expected_verdict in cases:
     try:
-        result = pipeline_run(user_input)
+        with patch("iris.pipeline.approval_prompt", return_value={"action": "approve"}):
+            result = pipeline_run(user_input)
         verdict_ok  = result["verdict"] == expected_verdict
         run_id_ok   = bool(result.get("run_id"))
         response_ok = bool(result.get("response"))
@@ -386,7 +387,8 @@ print("  note: case 1 requires Ollama running with iris-slot1 and iris-slot2\n")
 # Case 1 — live: state_change triggers slot_2, both slots agree → proceed to verdict
 # Prompt nudges model toward write_file to avoid vocabulary drift failing the test
 try:
-    result = pipeline_run("Write 'hello' to /tmp/iris_test.txt using write_file")
+    with patch("iris.pipeline.approval_prompt", return_value={"action": "approve"}):
+        result = pipeline_run("Write 'hello' to /tmp/iris_test.txt using write_file")
     # state_change must have triggered — if unknown gate fired instead, verdict is reject
     # and slot_2 was never called. Check error field to distinguish.
     slot2_triggered = result.get("error") != "slot_conflict" and result.get("verdict") in ("proceed", "require_confirmation", "reject")

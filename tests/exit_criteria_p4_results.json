@@ -1,0 +1,218 @@
+{
+  "exit_criteria": {
+    "ec1_approve_gate": {
+      "pass": true,
+      "passed": 10,
+      "total": 10,
+      "crashes": 0
+    },
+    "ec2_reject_kill_clean": {
+      "pass": true,
+      "passed": 10,
+      "total": 10,
+      "crashes": 0
+    },
+    "ec3_modify_returns_amended_input": {
+      "pass": true,
+      "passed": 5,
+      "total": 5,
+      "crashes": 0
+    }
+  },
+  "approve_results": [
+    {
+      "prompt": "Read the file at /tmp/test.txt and summarize its contents",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "List the files in /tmp",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Write 'hello' to /tmp/iris_test.txt using write_file",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Delete the file at /tmp/test.txt using delete_file",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Append 'entry' to /tmp/log.txt using append_file",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Read /tmp/config.txt",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Save 'done' to /tmp/status.txt using write_file",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Remove /tmp/old_log.txt using remove_file",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Summarize the contents of /tmp/notes.txt",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    },
+    {
+      "prompt": "Write 'debug=true' to /tmp/config.txt using write_file",
+      "user_action": "approve",
+      "error": null,
+      "db_action": "approve",
+      "pass": true
+    }
+  ],
+  "reject_kill_results": [
+    {
+      "prompt": "Read the file at /tmp/test.txt",
+      "expected_action": "reject",
+      "user_action": "reject",
+      "error": null,
+      "db_action": "reject",
+      "pass": true
+    },
+    {
+      "prompt": "Write 'hello' to /tmp/iris_test.txt using write_file",
+      "expected_action": "reject",
+      "user_action": "reject",
+      "error": null,
+      "db_action": "reject",
+      "pass": true
+    },
+    {
+      "prompt": "Delete the file at /tmp/test.txt using delete_file",
+      "expected_action": "reject",
+      "user_action": "reject",
+      "error": null,
+      "db_action": "reject",
+      "pass": true
+    },
+    {
+      "prompt": "Append 'entry' to /tmp/log.txt using append_file",
+      "expected_action": "kill",
+      "user_action": "kill",
+      "error": null,
+      "db_action": "kill",
+      "pass": true
+    },
+    {
+      "prompt": "Save 'done' to /tmp/status.txt using write_file",
+      "expected_action": "kill",
+      "user_action": "kill",
+      "error": null,
+      "db_action": "kill",
+      "pass": true
+    },
+    {
+      "prompt": "Remove /tmp/old_log.txt using remove_file",
+      "expected_action": "kill",
+      "user_action": "kill",
+      "error": null,
+      "db_action": "kill",
+      "pass": true
+    },
+    {
+      "prompt": "Summarize /tmp/notes.txt",
+      "expected_action": "reject",
+      "user_action": "reject",
+      "error": null,
+      "db_action": "reject",
+      "pass": true
+    },
+    {
+      "prompt": "Write 'debug=true' to /tmp/config.txt using write_file",
+      "expected_action": "kill",
+      "user_action": "kill",
+      "error": null,
+      "db_action": "kill",
+      "pass": true
+    },
+    {
+      "prompt": "Read /tmp/config.txt",
+      "expected_action": "reject",
+      "user_action": "reject",
+      "error": null,
+      "db_action": "reject",
+      "pass": true
+    },
+    {
+      "prompt": "List the files in /tmp",
+      "expected_action": "kill",
+      "user_action": "kill",
+      "error": null,
+      "db_action": "kill",
+      "pass": true
+    }
+  ],
+  "modify_results": [
+    {
+      "prompt": "Read this",
+      "amended_input": "Read the file at /tmp/test.txt",
+      "user_action": "modify",
+      "error": null,
+      "db_action": "modify",
+      "pass": true
+    },
+    {
+      "prompt": "Delete that",
+      "amended_input": "Delete the file at /tmp/test.txt using delete_file",
+      "user_action": "modify",
+      "error": null,
+      "db_action": "modify",
+      "pass": true
+    },
+    {
+      "prompt": "Save it",
+      "amended_input": "Save 'ok' to /tmp/result.txt using write_file",
+      "user_action": "modify",
+      "error": null,
+      "db_action": "modify",
+      "pass": true
+    },
+    {
+      "prompt": "Update the thing",
+      "amended_input": "Write 'updated' to /tmp/notes.txt using write_file",
+      "user_action": "modify",
+      "error": null,
+      "db_action": "modify",
+      "pass": true
+    },
+    {
+      "prompt": "Clean up",
+      "amended_input": "Delete the file at /tmp/temp.txt using delete_file",
+      "user_action": "modify",
+      "error": null,
+      "db_action": "modify",
+      "pass": true
+    }
+  ]
+}
