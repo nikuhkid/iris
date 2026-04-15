@@ -46,6 +46,7 @@ from iris.model_caller import call_with_retry
 from iris.slot2 import call as slot2_call
 from iris.comparator import compare
 from iris import logger
+from iris import observer
 
 SLOT1_MODEL = "iris-slot1"
 
@@ -56,6 +57,14 @@ def _log(run_id: str, **fields) -> None:
         logger.update_run(run_id, **fields)
     except Exception as e:
         print(f"[pipeline] logger update failed: {e}")
+
+
+def _seal(run_id: str) -> None:
+    """Fire-and-forget observer seal. Never raises."""
+    try:
+        observer.seal_run(run_id)
+    except Exception as e:
+        print(f"[pipeline] observer.seal_run failed: {e}")
 
 
 def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
@@ -101,6 +110,7 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
         _log(run_id, pipeline_error=guarded["reason"], verdict="reject")
         response = f"Input rejected: {guarded['reason']}"
         _log(run_id, response=response)
+        _seal(run_id)
         return {
             "run_id": run_id,
             "response": response,
@@ -129,6 +139,7 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
         else:
             response = f"Plan invalid after {validation.get('attempts')} attempt(s): {error} — {detail}"
         _log(run_id, pipeline_error=error, verdict="reject", response=response)
+        _seal(run_id)
         return {
             "run_id": run_id,
             "response": response,
@@ -162,6 +173,7 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
                 f"Cannot confirm intent. Please clarify or retry."
             )
             _log(run_id, pipeline_error=f"slot2_{error}", verdict="reject", response=response)
+            _seal(run_id)
             return {
                 "run_id":   run_id,
                 "response": response,
@@ -192,6 +204,7 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
                 f"Cannot proceed without clarification."
             )
             _log(run_id, pipeline_error="slot_conflict", verdict="reject", response=response)
+            _seal(run_id)
             return {
                 "run_id":     run_id,
                 "response":   response,
@@ -235,11 +248,13 @@ def run(user_input: str, source: str = "cli", user_id: str = None) -> dict:
         }
         if approval["action"] == "modify":
             result["amended_input"] = approval["amended_input"]
+        _seal(run_id)
         return result
 
     # Stage 9 — response
     response = respond(verdict, plan)
     _log(run_id, response=response["response"])
+    _seal(run_id)
 
     return {
         "run_id":      run_id,

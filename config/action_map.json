@@ -6,7 +6,7 @@
     "search_web", "search_engine_query", "query_database",
     "file_read", "file_dump", "file_peek", "cat", "os.listdir",
     "tail", "file_search", "summarize_content", "db.query",
-    "search_file", "display_text"
+    "search_file", "display_text", "fetch_file"
   ],
   "write": [
     "write_file", "store_memory", "update_db", "append_file",

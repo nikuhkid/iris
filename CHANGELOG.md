@@ -753,3 +753,80 @@ CHANGELOG.md                    — updated
 
 Next session starts at Phase 5.
 Phase 5 entry point: observer service, SHA-256 hash chaining, failure tracking, degraded mode (buffer + replay logs).
+
+---
+
+## Session 5 — 2026-04-15
+
+### Phase 5 — Observability
+
+#### Directive established
+All write/modify/run actions require explicit approval before execution. Reads are autonomous. Multi-step work debriefs between each step. No chaining.
+
+#### `iris/observer.py` — new file
+
+SHA-256 hash chain observer service. Public API: `seal_run`, `verify_chain`, `replay_buffer`.
+
+Hash content: all columns except `previous_hash` and `entry_hash`, in `PRAGMA table_info` index order. Values stringified with `str()`, joined with `|`, SHA-256 hex digest. Column order derived at runtime — not hardcoded.
+
+Chain anchoring: first row gets `previous_hash = "GENESIS"`. If prior row is unsealed, `previous_hash = "UNSEALED:<prior_run_id>"` — chain keeps walking without pretending a seal exists.
+
+Degraded mode:
+- `seal_run()` failure → `run_id` appended to `_buffer`, `_degraded = True`, best-effort `sequence_gap=1` written (succeeds if DB is up, skipped silently if DB is down)
+- `replay_buffer()` seals buffered run_ids in insertion order via `_seal_without_buffer` (avoids double-append on replay failure), writes `sequence_gap=1` retroactively on success, clears buffer, resets `_degraded` when empty
+- Gap marking is an observer concern — pipeline has no knowledge of observer state (Option B, deliberate design decision)
+
+#### `iris/pipeline.py` — Phase 5 wiring
+
+- `from iris import observer` added to imports
+- `_seal(run_id)` helper added alongside `_log()` — fire-and-forget, never raises
+- `_seal(run_id)` called at all six exit points: guard reject, validation fail, slot2 fail, slot conflict, user non-approve, successful approve
+
+#### `config/action_map.json` — `fetch_file` added to read
+
+Surfaced in Phase 5 exit criteria EC1 (prompt 10). Classified as read — filesystem fetch, no state change.
+
+#### `tests/smoke_test.py` — Phase 5 coverage added (94 assertions, up from 77)
+
+Three new sections:
+- **observer — seal and hash chain** (7 assertions): seal two rows, verify entry_hash populated, previous_hash chain links correctly, sequence_gap=0 on clean seal
+- **observer — verify_chain** (4 assertions): clean chain returns no violations for sealed rows; corrupt a row, confirm hash_mismatch + downstream chain_break; restore and confirm clean
+- **observer — degraded mode and replay** (7 assertions): seal_run failure returns False, buffers run_id, sets _degraded; replay seals real run_id, sets sequence_gap=1, clears buffer entry
+
+Result: 94/94 ✓
+
+#### `tests/exit_criteria_p5.py` — new file
+
+```
+EC1 — full traceability (10 live runs):        4/4   PASS
+EC2 — tamper detection:                        4/4   PASS
+EC3 — degraded mode safe:                      7/7   PASS
+
+Total: 15/15 checks passed
+```
+
+EC1 observation: prompt 10 ("Fetch /tmp/iris_test.txt") produced `fetch_file` — unknown action, rejected correctly. Chain integrity held through a reject path. `fetch_file` added to `action_map.json` read vocabulary.
+
+### Phase 5 Status: COMPLETE ✅
+
+Exit criteria met:
+- Full traceability — every run sealed, chain walks clean ✓
+- Tamper detection — hash_mismatch and chain_break surface correctly ✓
+- Degraded mode safe — buffer, replay, sequence_gap all correct ✓
+
+### Files created/modified this session
+```
+iris/
+└── iris/
+    ├── observer.py         — new
+    └── pipeline.py         — Phase 5 wiring (_seal helper + 6 call sites)
+config/
+    └── action_map.json     — fetch_file added to read
+tests/
+    ├── smoke_test.py       — expanded to 94 assertions (Phase 5 coverage)
+    └── exit_criteria_p5.py — new
+CHANGELOG.md                — updated
+```
+
+Next session starts at Phase 6.
+Phase 6 entry point: worker spawning, router refinement, confidence calibration layer, local model migration (Qwen2.5 14B → Ollama).

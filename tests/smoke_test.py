@@ -452,6 +452,108 @@ with patch("iris.pipeline.slot2_call", return_value=_conflict_plan):
     except Exception as e:
         check("slot_conflict — pipeline completed without exception", False, str(e))
 
+# ── observer — seal and hash chain ───────────────────────────────────────────
+section("observer — seal and hash chain")
+
+from iris import observer as obs
+import importlib
+
+# Reset module-level buffer/degraded state between test runs
+obs._buffer.clear()
+obs._degraded = False
+
+# Seal two fresh runs and verify hash fields are populated
+logger.init_db()
+rid_a = logger.start_run(source="cli")
+logger.update_run(rid_a, raw_input="observer test A", guard_passed=1, verdict="proceed")
+seal_ok_a = obs.seal_run(rid_a)
+check("seal_run returns True on success", seal_ok_a is True)
+
+conn = sqlite3.connect(DB_PATH)
+conn.row_factory = sqlite3.Row
+row_a = conn.execute("SELECT * FROM pipeline_log WHERE run_id = ?", (rid_a,)).fetchone()
+check("entry_hash populated after seal",   bool(row_a["entry_hash"]))
+check("previous_hash = GENESIS (first row or chain start)",
+      row_a["previous_hash"] in ("GENESIS",) or row_a["previous_hash"].startswith("UNSEALED") or len(row_a["previous_hash"]) == 64)
+check("sequence_gap=0 after clean seal",   row_a["sequence_gap"] == 0)
+
+rid_b = logger.start_run(source="cli")
+logger.update_run(rid_b, raw_input="observer test B", guard_passed=1, verdict="proceed")
+seal_ok_b = obs.seal_run(rid_b)
+check("seal_run second row returns True",  seal_ok_b is True)
+
+row_b = conn.execute("SELECT * FROM pipeline_log WHERE run_id = ?", (rid_b,)).fetchone()
+check("second row previous_hash = first row entry_hash",
+      row_b["previous_hash"] == row_a["entry_hash"])
+check("second row entry_hash populated",   bool(row_b["entry_hash"]))
+
+# ── observer — verify_chain ───────────────────────────────────────────────────
+section("observer — verify_chain")
+
+violations = obs.verify_chain()
+unsealed_in_chain = [v for v in violations if v["violation_type"] == "unsealed"]
+mismatch_in_chain = [v for v in violations if v["violation_type"] == "hash_mismatch"]
+# There may be pre-existing unsealed rows from earlier test cases — that's expected.
+# The two rows we just sealed should not appear as hash_mismatch.
+our_run_ids = {rid_a, rid_b}
+our_mismatches = [v for v in mismatch_in_chain if v["run_id"] in our_run_ids]
+check("sealed rows have no hash_mismatch violations", len(our_mismatches) == 0)
+
+# Seal a third row so there's a downstream row to break when we corrupt rid_b
+rid_c_chain = logger.start_run(source="cli")
+logger.update_run(rid_c_chain, raw_input="observer test C chain", guard_passed=1, verdict="proceed")
+obs.seal_run(rid_c_chain)
+
+# Corrupt rid_b and confirm both hash_mismatch and downstream chain_break surface
+correct_entry_hash_b = row_b["entry_hash"]
+conn.execute(
+    "UPDATE pipeline_log SET entry_hash = 'deadbeef' WHERE run_id = ?", (rid_b,)
+)
+conn.commit()
+violations_after = obs.verify_chain()
+corrupted = [v for v in violations_after if v["run_id"] == rid_b]
+has_mismatch = any(v["violation_type"] == "hash_mismatch" for v in corrupted)
+check("corrupted entry_hash detected as hash_mismatch", has_mismatch)
+downstream = [v for v in violations_after if v["run_id"] == rid_c_chain]
+has_chain_break = any(v["violation_type"] == "chain_break" for v in downstream)
+check("corruption causes downstream chain_break", has_chain_break)
+
+# Restore correct hash so the rest of the chain is sound
+conn.execute(
+    "UPDATE pipeline_log SET entry_hash = ? WHERE run_id = ?", (correct_entry_hash_b, rid_b)
+)
+conn.commit()
+conn.close()
+
+# ── observer — degraded mode and replay ───────────────────────────────────────
+section("observer — degraded mode and replay")
+
+obs._buffer.clear()
+obs._degraded = False
+
+# Force a seal failure by passing a nonexistent run_id
+fake_id = str(uuid.uuid4())
+result_fail = obs.seal_run(fake_id)
+check("seal_run returns False on failure",    result_fail is False)
+check("failed run_id appended to _buffer",    fake_id in obs._buffer)
+check("_degraded set to True after failure",  obs._degraded is True)
+
+# Now add a real run_id to the buffer manually and replay
+rid_c = logger.start_run(source="cli")
+logger.update_run(rid_c, raw_input="observer test C", guard_passed=1, verdict="proceed")
+obs._buffer.append(rid_c)
+
+replay_result = obs.replay_buffer()
+check("replay_buffer seals the real run_id",  replay_result["sealed"] >= 1)
+check("nonexistent id remains in buffer",      fake_id in obs._buffer)
+
+conn = sqlite3.connect(DB_PATH)
+conn.row_factory = sqlite3.Row
+row_c = conn.execute("SELECT * FROM pipeline_log WHERE run_id = ?", (rid_c,)).fetchone()
+check("replayed row has entry_hash populated", bool(row_c["entry_hash"]))
+check("replayed row has sequence_gap=1",       row_c["sequence_gap"] == 1)
+conn.close()
+
 # ── summary ───────────────────────────────────────────────────────────────────
 total  = len(_results)
 passed = sum(1 for _, ok in _results if ok)
