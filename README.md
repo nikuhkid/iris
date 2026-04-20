@@ -61,11 +61,13 @@ entry_point (cli | discord | interface)
 
 | Slot | Model | Role |
 |------|-------|------|
-| 1 | Qwen2.5 14B local (Ollama) | Primary — default path, temp 0.2 |
-| 2 | Qwen2.5 14B local (Ollama) | Independent validator, temp 0.3 |
+| 1 | Qwen2.5 7B local (Ollama, Q4_K_M) | Primary — default path, temp 0.2 |
+| 2 | Qwen2.5 7B local (Ollama, Q4_K_M) | Independent validator, temp 0.3 |
 | 3 | Claude API | Last resort — repeated schema failure only |
 
 Slot 3 never resolves Slot 1 vs Slot 2 conflicts. Conflicts are a human problem.
+
+7B is the current deployed model. Migration to 14B is Phase 6 scope (blocked on VRAM — requires Wolfie or quantization strategy).
 
 ---
 
@@ -85,10 +87,27 @@ Slot 3 never resolves Slot 1 vs Slot 2 conflicts. Conflicts are a human problem.
 - [x] Loss-aversion rules formalized
 - [x] Model layer separated (planning vs response)
 - [x] DPO scope bounded
-- [ ] Implementation
+- [x] Phase 1 — skeleton (validator, plan analysis, decision engine, pipeline)
+- [x] Phase 2 — reliability (retry logic, SQLite logging, input variation testing)
+- [x] Phase 3 — redundancy (slot 2, comparator, conflict escalation)
+- [x] Phase 4 — control layer (dry run, approval loop, decision tracking)
+- [x] Phase 5 — observability (SHA-256 hash chain, degraded mode, tamper detection) — 94/94 smoke tests passing
+- [ ] Phase 6 — agent runtime (design in progress — 3 sessions remaining)
+- [ ] Local model migration (7B → 14B)
 - [ ] Local model training pipeline
 - [ ] Discord transport
 - [ ] Phone client
+
+---
+
+## Specification Documents
+
+| Document | Covers |
+|---|---|
+| [`docs/IRIS_Runtime_Contract.docx`](./docs/IRIS_Runtime_Contract.docx) | Agent event model, transport, backpressure, heartbeat, cancellation, hierarchy (v4.2) |
+| [`docs/IRIS_Agent_Structure.docx`](./docs/IRIS_Agent_Structure.docx) | Registry, policy shape, coordinator, spawn mappings (v4.3) |
+| [`docs/IRIS_Policy_Profiles.docx`](./docs/IRIS_Policy_Profiles.docx) | Concrete policy profile contents per worker |
+| [`docs/memory_architecture.md`](./docs/memory_architecture.md) | Three-axis memory model — deferred |
 
 ---
 

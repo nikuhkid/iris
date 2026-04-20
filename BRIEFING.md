@@ -104,7 +104,7 @@ All three must pass before flagging:
 
 ## Build Plan — Phase by Phase
 
-### Phase 1 — Skeleton (Make it breathe)
+### Phase 1 — Skeleton ✅ COMPLETE
 **Scope:** input → plan → analyze → decide → respond. No redundancy. No orchestration. No ego.
 
 **Components:**
@@ -130,7 +130,7 @@ All three must pass before flagging:
 - decision_engine blocks destructive phrasing
 - response_model never claims execution authority
 
-### Phase 2 — Reliability (Stress it)
+### Phase 2 — Reliability ✅ COMPLETE
 **Additions:** retry logic, basic logging, input variation tests
 
 **Tasks:**
@@ -141,7 +141,7 @@ All three must pass before flagging:
 
 **Exit criteria:** failure patterns identified, no silent failures, retry improves validity rate
 
-### Phase 3 — Redundancy (Paranoia earns its keep)
+### Phase 3 — Redundancy ✅ COMPLETE
 **Additions:** slot_2, comparator, critical_fail escalation
 
 **Tasks:**
@@ -152,7 +152,7 @@ All three must pass before flagging:
 
 **Exit criteria:** slot independence confirmed, comparator not over-triggering, conflicts surface cleanly
 
-### Phase 4 — Control Layer (Decision gets teeth)
+### Phase 4 — Control Layer ✅ COMPLETE
 **Additions:** dry_run, user_action loop, expanded decision_engine rules
 
 **Tasks:**
@@ -163,7 +163,7 @@ All three must pass before flagging:
 
 **Exit criteria:** no execution without approval, modification loop stable, user control complete
 
-### Phase 5 — Observability (Earn the paranoia badge)
+### Phase 5 — Observability ✅ COMPLETE (94/94 smoke tests passing)
 **Additions:** observer service, hash chain integrity, failure tracking
 
 **Tasks:**
@@ -174,11 +174,18 @@ All three must pass before flagging:
 
 **Exit criteria:** full traceability, tamper detection working, degraded mode safe
 
-### Phase 6 — Later (Don't touch early)
-- Worker spawning
-- Router refinement
-- Confidence calibration layer
-- Local model migration (Qwen2.5 14B → Ollama)
+### Phase 6 — Agent Runtime (Design in progress)
+**Scope:** worker spawning, router refinement, confidence calibration, local model migration (7B → 14B)
+
+**Spec documents (in `docs/`) — designed via adversarial review (Claude + GPT):**
+- `IRIS_Runtime_Contract.docx` — agent event model, lifecycle, transport, hierarchy (v4.2) ✅
+- `IRIS_Agent_Structure.docx` — registry, policy shape, coordinator, spawn mappings (v4.3) ✅
+- `IRIS_Policy_Profiles.docx` — concrete policy profile contents per worker ✅
+
+**Remaining design sessions (3) — implementation blocked until all complete:**
+1. Agent behavior — system prompts + tool surface per worker (one session, not two)
+2. Aggregation logic — coordinator combining worker results
+3. Failure propagation — worker → coordinator → pipeline
 
 ---
 
@@ -234,12 +241,12 @@ When confirmations become noise. That's a calibration problem. Phase 4 tracks de
 
 ## Repo State
 
-Both repos are on GitHub, private except mnem which is public.
+Both repos are on GitHub. Both are public.
 
-**mnem** (public): infrastructure, core code, methodology docs
-**iris** (private): architecture_4.0.json, README
+**iris**: Phases 1–5 implementation complete. Phase 6 design in progress. Spec documents in `docs/`.
+**mnem**: infrastructure, core code, methodology docs
 
-Neither repo has implementation code yet. Phase 1 is the starting point.
+IRIS work: Wolfie clone → push → Parrot pulls when resuming there.
 
 ---
 
@@ -247,13 +254,13 @@ Neither repo has implementation code yet. Phase 1 is the starting point.
 
 1. Load this file
 2. Read `architecture_4.0.json` for full layer specs
-3. Start with Phase 1 — skeleton only
+3. For Phase 6: read `docs/IRIS_Runtime_Contract.docx`, `docs/IRIS_Agent_Structure.docx`, `docs/IRIS_Policy_Profiles.docx` — in that order
 4. Build and test each component independently before wiring
 5. Do not skip exit criteria before moving phases
 
 ---
 
-*Last updated: April 8, 2026*
+*Last updated: April 2026 — Phase 6 design in progress*
 *Session: context-window-limited — this doc is the handoff*
 
 ---
